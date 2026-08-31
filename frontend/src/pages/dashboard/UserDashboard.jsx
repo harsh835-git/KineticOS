@@ -27,8 +27,9 @@ import {
   LineChart,
   Scale,
   Award,
+  Repeat,
+  Check,
 } from "lucide-react";
-
 import {
   ResponsiveContainer,
   AreaChart,
@@ -48,8 +49,18 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("overview"); // "overview", "workout", "nutrition", "analytics"
+  const [activeTab, setActiveTab] = useState("overview"); // "overview" | "workout" | "nutrition" | "analytics"
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Smart Swap Modal State
+  const [swapModalOpen, setSwapModalOpen] = useState(false);
+  const [swapLoading, setSwapLoading] = useState(false);
+  const [swapData, setSwapData] = useState({
+    type: "", // "exercise" | "meal"
+    currentItem: null,
+    dayName: "",
+    suggestions: [],
+  });
 
   const fetchDashboardAndLogs = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -96,6 +107,66 @@ const Dashboard = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/login");
+  };
+
+  // Open Swap Modal & Trigger AI Synthesis
+  const handleOpenSwap = async (type, currentItem, dayName) => {
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const userId = storedUser.id || storedUser._id;
+
+    setSwapData({ type, currentItem, dayName, suggestions: [] });
+    setSwapModalOpen(true);
+    setSwapLoading(true);
+
+    try {
+      const res = await fetch("http://localhost:5000/api/swap/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, currentItem, dayName, userId }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setSwapData((prev) => ({ ...prev, suggestions: result.suggestions }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch swap suggestions:", err);
+    } finally {
+      setSwapLoading(false);
+    }
+  };
+
+  // Apply Selected AI Alternative to MongoDB
+  const handleApplySwap = async (selectedItem) => {
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const userId = storedUser.id || storedUser._id;
+
+    setUpdating(true);
+    setSwapModalOpen(false);
+
+    try {
+      const oldItemName =
+        swapData.type === "exercise"
+          ? swapData.currentItem.name
+          : swapData.currentItem.mealName;
+
+      await fetch("http://localhost:5000/api/swap/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          type: swapData.type,
+          dayName: swapData.dayName,
+          oldItemName,
+          newItem: selectedItem,
+        }),
+      });
+
+      await fetchDashboardAndLogs();
+    } catch (err) {
+      console.error("Failed to apply swap:", err);
+    } finally {
+      setUpdating(false);
+    }
   };
 
   // Toggle Exercise Check-off
@@ -321,7 +392,7 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="max-h-screen bg-[#050507] text-white flex relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#050507] text-white flex relative overflow-x-hidden">
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute -top-48 -left-48 w-[550px] h-[550px] rounded-full bg-violet-700/10 blur-[160px]" />
@@ -331,18 +402,95 @@ const Dashboard = () => {
       {updating && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
           <RefreshCw className="animate-spin text-violet-400" size={32} />
-          <p className="text-xs font-semibold text-zinc-300 tracking-wider uppercase">Adapting Engine & Generating Plans...</p>
+          <p className="text-xs font-semibold text-zinc-300 tracking-wider uppercase">Updating KineticOS Matrix...</p>
         </div>
       )}
 
-      {/* ================= SIDEBAR ================= */}
+      {/* ================= SMART SWAP MODAL (GEMINI GEN AI) ================= */}
+      {swapModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#0e0e14] border border-white/[0.1] rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
+                  <Repeat size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Smart {swapData.type === "exercise" ? "Exercise" : "Meal"} Swap</h3>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">
+                    Synthesizing identical metabolic & biomechanical outputs
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSwapModalOpen(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.05]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Current Item Preview */}
+            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-5">
+              <span className="text-[10px] uppercase font-bold text-zinc-500">Currently Replacing:</span>
+              <p className="text-xs font-semibold text-zinc-200 mt-0.5">
+                {swapData.type === "exercise"
+                  ? `${swapData.currentItem?.name} (${swapData.currentItem?.sets} × ${swapData.currentItem?.reps})`
+                  : `${swapData.currentItem?.mealName} (${swapData.currentItem?.calories} kcal)`}
+              </p>
+            </div>
+
+            {/* AI Generated Suggestions */}
+            {swapLoading ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3">
+                <RefreshCw className="animate-spin text-violet-400" size={26} />
+                <p className="text-xs text-zinc-400">Synthesizing 3 precision alternatives via Gemini...</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                {swapData.suggestions.map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleApplySwap(item)}
+                    className="p-4 rounded-2xl bg-white/[0.025] border border-white/[0.06] hover:border-violet-500/50 hover:bg-violet-950/20 transition cursor-pointer flex items-center justify-between group"
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-white group-hover:text-violet-300 transition">
+                        {swapData.type === "exercise" ? item.name : item.mealName}
+                      </p>
+                      {swapData.type === "exercise" ? (
+                        <p className="text-[10px] text-zinc-500 mt-0.5">
+                          {item.equipment} • {item.formGuidance}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-zinc-500 mt-0.5">
+                          {item.suggestedItems?.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <span className="text-xs font-mono font-bold text-violet-400">
+                        {swapData.type === "exercise"
+                          ? `${item.sets} × ${item.reps}`
+                          : `${item.calories} kcal`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= COMPACT & EXPANDABLE SIDEBAR ================= */}
       <aside
         className={`h-screen sticky top-0 bg-[#09090c]/95 border-r border-white/[0.06] backdrop-blur-2xl flex flex-col justify-between py-5 z-40 shrink-0 transition-all duration-300 ease-in-out ${
           sidebarOpen ? "w-64 px-4" : "w-16 px-2 items-center"
         }`}
       >
         <div className="flex flex-col gap-4 w-full">
-          {/* Hamburger Toggle */}
+          {/* Top Menu / Hamburger Toggle */}
           <div className="flex items-center justify-center w-full">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -400,7 +548,7 @@ const Dashboard = () => {
                     ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25"
                     : "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
                 }`}
-                title={`Diet: ${isVeg ? "Vegetarian" : "Non-Vegetarian"}`}
+                title={`Diet: ${isVeg ? "Vegetarian (Click to switch)" : "Non-Vegetarian (Click to switch)"}`}
               >
                 <span className="text-sm select-none">{isVeg ? "🌱" : "🍗"}</span>
               </button>
@@ -409,7 +557,7 @@ const Dashboard = () => {
 
           <div className="w-full h-px bg-white/[0.08] my-0.5" />
 
-          {/* Navigation Links */}
+          {/* Navigation Items */}
           <div className="flex flex-col gap-1.5 w-full items-center">
             {navigationItems.map((item) => {
               const Icon = item.icon;
@@ -437,7 +585,7 @@ const Dashboard = () => {
             })}
           </div>
 
-          {/* Target Goal Selector */}
+          {/* Goal Selector */}
           {sidebarOpen && (
             <div className="p-3 rounded-xl bg-white/[0.025] border border-white/[0.06] mt-1">
               <label className="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider mb-1.5">
@@ -459,7 +607,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* User Badge & Logout */}
+        {/* User & Logout Section */}
         <div className="flex flex-col gap-2.5 w-full pt-3 border-t border-white/[0.06] items-center">
           <div className={`flex items-center gap-2.5 ${sidebarOpen ? "w-full px-1" : "justify-center"}`}>
             <div
@@ -485,6 +633,11 @@ const Dashboard = () => {
           >
             <LogOut size={16} className="shrink-0" />
             {sidebarOpen && <span>Sign Out</span>}
+            {!sidebarOpen && (
+              <span className="absolute left-14 px-2.5 py-1 rounded-md bg-[#18181f] border border-white/[0.1] text-red-400 text-[11px] font-semibold whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition shadow-xl z-50">
+                Sign Out
+              </span>
+            )}
           </button>
         </div>
       </aside>
@@ -496,13 +649,10 @@ const Dashboard = () => {
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.35)] shrink-0">
               <Activity size={16} className="text-white" />
             </div>
-
             <span className="text-base font-bold tracking-tight text-white leading-none">
               Kinetic<span className="text-violet-500">OS</span>
             </span>
-
             <span className="text-zinc-600 font-light text-lg select-none">/</span>
-
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-violet-600/15 border border-violet-500/30 text-violet-300 text-xs font-semibold tracking-wide">
               {activeTab === "overview" && <LayoutDashboard size={13} />}
               {activeTab === "workout" && <Dumbbell size={13} />}
@@ -532,8 +682,9 @@ const Dashboard = () => {
         </header>
 
         <main className="flex-1 p-6 lg:p-8 max-w-6xl w-full mx-auto">
-          {/* Top 5 Metrics Strip */}
+          {/* ================= 5 BALANCED METRICS STRIP ================= */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-8">
+            {/* 1. Active Goal */}
             <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
               <div className="flex items-center justify-between text-zinc-400">
                 <span className="text-[10px] uppercase tracking-wider font-semibold">Active Goal</span>
@@ -543,6 +694,7 @@ const Dashboard = () => {
               <span className="text-[10px] text-zinc-500 capitalize">{profile.experienceLevel} • {profile.dietaryPreference}</span>
             </div>
 
+            {/* 2. Target Fuel */}
             <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
               <div className="flex items-center justify-between text-zinc-400">
                 <span className="text-[10px] uppercase tracking-wider font-semibold">Target Fuel</span>
@@ -554,6 +706,7 @@ const Dashboard = () => {
               <span className="text-[10px] text-zinc-500">Maint: {profile.maintenanceCalories || 2500} kcal</span>
             </div>
 
+            {/* 3. BODY MASS INDEX (BMI) */}
             <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
               <div className="flex items-center justify-between text-zinc-400">
                 <span className="text-[10px] uppercase tracking-wider font-semibold">Body Mass Index</span>
@@ -563,6 +716,7 @@ const Dashboard = () => {
               <span className="text-[10px] text-zinc-500">{profile.currentWeight || 67} kg → Goal: {profile.targetWeight || 50} kg</span>
             </div>
 
+            {/* 4. Hydration Tracker */}
             <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
               <div className="flex items-center justify-between text-zinc-400">
                 <span className="text-[10px] uppercase tracking-wider font-semibold">Hydration</span>
@@ -587,12 +741,11 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Streak & Habit Metric */}
-            {/* 5. Habit Engine & Streak (Combined) */}
+           {/* 5. Habit Engine & Streak (Combined) */}
             <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
               <div className="flex items-center justify-between text-zinc-400">
                 <span className="text-[10px] uppercase tracking-wider font-semibold">Habit Engine</span>
-                <span className="text-xs">🔥 {analytics?.streak ?? 0} days</span>
+                <span className="text-xs">🔥 {analytics?.streak || 1}d</span>
               </div>
               <p className="text-base font-bold mt-2 text-purple-300">
                 {dailyLog?.habitScore || 0}<span className="text-xs text-zinc-400">/100</span>
@@ -609,6 +762,7 @@ const Dashboard = () => {
           {/* ================= TAB 1: TODAY'S OVERVIEW ================= */}
           {activeTab === "overview" && (
             <div className="grid lg:grid-cols-2 gap-8">
+              {/* Today's Workout Card with Checkboxes and Smart Swap */}
               <div className="rounded-3xl bg-[#101015]/80 border border-white/[0.08] p-6 backdrop-blur-2xl">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2 text-violet-400 font-bold text-xs uppercase tracking-wider">
@@ -632,14 +786,16 @@ const Dashboard = () => {
                       return (
                         <div
                           key={i}
-                          onClick={() => handleToggleExercise(ex.name)}
-                          className={`p-3.5 rounded-xl border transition flex items-center justify-between cursor-pointer select-none ${
+                          className={`p-3.5 rounded-xl border transition flex items-center justify-between group ${
                             isCompleted
                               ? "bg-violet-950/25 border-violet-500/40 opacity-80"
                               : "bg-white/[0.025] border-white/[0.05] hover:border-violet-500/30"
                           }`}
                         >
-                          <div className="flex items-center gap-3">
+                          <div
+                            onClick={() => handleToggleExercise(ex.name)}
+                            className="flex items-center gap-3 cursor-pointer flex-1 select-none"
+                          >
                             <button
                               type="button"
                               className={`p-1 rounded-lg transition ${
@@ -655,9 +811,21 @@ const Dashboard = () => {
                               <p className="text-[11px] text-zinc-500 mt-0.5">{ex.formGuidance}</p>
                             </div>
                           </div>
-                          <div className="text-right shrink-0 ml-3">
-                            <span className="text-xs font-mono font-bold text-violet-300">{ex.sets} × {ex.reps}</span>
-                            <p className="text-[10px] text-zinc-600">{ex.restSeconds}s rest</p>
+
+                          <div className="flex items-center gap-3 shrink-0 ml-3">
+                            <div className="text-right">
+                              <span className="text-xs font-mono font-bold text-violet-300">{ex.sets} × {ex.reps}</span>
+                              <p className="text-[10px] text-zinc-600">{ex.restSeconds}s rest</p>
+                            </div>
+
+                            {/* Smart Swap Icon */}
+                            <button
+                              onClick={() => handleOpenSwap("exercise", ex, currentDay)}
+                              className="p-2 rounded-lg text-zinc-500 hover:text-violet-300 hover:bg-violet-500/10 transition cursor-pointer"
+                              title="Swap exercise alternative"
+                            >
+                              <Repeat size={14} />
+                            </button>
                           </div>
                         </div>
                       );
@@ -666,6 +834,7 @@ const Dashboard = () => {
                 )}
               </div>
 
+              {/* Today's Diet & Macros with Smart Swap */}
               <div className="rounded-3xl bg-[#101015]/80 border border-white/[0.08] p-6 backdrop-blur-2xl">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
@@ -676,6 +845,7 @@ const Dashboard = () => {
                   </span>
                 </div>
 
+                {/* Macro Split Bar */}
                 <div className="grid grid-cols-3 gap-2 mb-5">
                   <div className="p-2.5 rounded-xl bg-black/30 border border-white/[0.05] text-center">
                     <span className="text-[10px] text-zinc-500 uppercase font-semibold">Protein</span>
@@ -691,20 +861,23 @@ const Dashboard = () => {
                   </div>
                 </div>
 
+                {/* Meals List */}
                 <div className="space-y-2.5">
                   {todayDiet?.meals?.map((meal, i) => {
                     const isEaten = dailyLog?.consumedMeals?.includes(meal.mealName);
                     return (
                       <div
                         key={i}
-                        onClick={() => handleToggleMeal(meal.mealName)}
-                        className={`p-3.5 rounded-xl border transition flex items-start justify-between cursor-pointer select-none ${
+                        className={`p-3.5 rounded-xl border transition flex items-start justify-between group ${
                           isEaten
                             ? "bg-amber-950/20 border-amber-500/40 opacity-80"
                             : "bg-white/[0.025] border-white/[0.05] hover:border-amber-500/30"
                         }`}
                       >
-                        <div className="flex items-start gap-3">
+                        <div
+                          onClick={() => handleToggleMeal(meal.mealName)}
+                          className="flex items-start gap-3 flex-1 cursor-pointer select-none"
+                        >
                           <button
                             type="button"
                             className={`p-1 mt-0.5 rounded-lg transition ${
@@ -727,8 +900,20 @@ const Dashboard = () => {
                             </ul>
                           </div>
                         </div>
-                        <div className="text-[10px] text-zinc-500 text-right shrink-0 ml-3">
-                          {meal.protein}P / {meal.carbs}C / {meal.fats}F
+
+                        <div className="flex items-center gap-3 shrink-0 ml-3">
+                          <div className="text-[10px] text-zinc-500 text-right">
+                            {meal.protein}P / {meal.carbs}C / {meal.fats}F
+                          </div>
+
+                          {/* Smart Swap Icon */}
+                          <button
+                            onClick={() => handleOpenSwap("meal", meal, currentDay)}
+                            className="p-2 rounded-lg text-zinc-500 hover:text-amber-300 hover:bg-amber-500/10 transition cursor-pointer"
+                            title="Swap meal alternative"
+                          >
+                            <Repeat size={14} />
+                          </button>
                         </div>
                       </div>
                     );
@@ -770,11 +955,20 @@ const Dashboard = () => {
                     {day.isRestDay ? (
                       <p className="text-[11px] text-zinc-500 italic">Active rest & muscle repair</p>
                     ) : (
-                      <ul className="space-y-1.5 text-xs text-zinc-400">
+                      <ul className="space-y-2 text-xs text-zinc-400">
                         {day.exercises?.map((e, idx) => (
-                          <li key={idx} className="flex justify-between">
+                          <li key={idx} className="flex justify-between items-center group">
                             <span>{e.name}</span>
-                            <span className="font-mono text-zinc-500">{e.sets}×{e.reps}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-zinc-500">{e.sets}×{e.reps}</span>
+                              <button
+                                onClick={() => handleOpenSwap("exercise", e, day.dayName)}
+                                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-violet-300 transition"
+                                title="Swap this exercise"
+                              >
+                                <Repeat size={12} />
+                              </button>
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -819,14 +1013,23 @@ const Dashboard = () => {
                     <p className="text-[10px] text-zinc-500 font-mono mb-3">
                       {day.macros?.macroSplit}
                     </p>
-                    <div className="space-y-2 text-xs">
+                    <div className="space-y-2.5 text-xs">
                       {day.meals?.map((m, idx) => (
-                        <div key={idx} className="border-t border-white/[0.04] pt-1.5">
-                          <div className="flex justify-between font-semibold text-zinc-300">
+                        <div key={idx} className="border-t border-white/[0.04] pt-2 group">
+                          <div className="flex justify-between items-center font-semibold text-zinc-300">
                             <span>{m.mealName}</span>
-                            <span className="text-zinc-500 font-mono">{m.calories} kcal</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-500 font-mono">{m.calories} kcal</span>
+                              <button
+                                onClick={() => handleOpenSwap("meal", m, day.dayName)}
+                                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-amber-300 transition"
+                                title="Swap this meal"
+                              >
+                                <Repeat size={12} />
+                              </button>
+                            </div>
                           </div>
-                          <p className="text-[11px] text-zinc-400 truncate">
+                          <p className="text-[11px] text-zinc-400 truncate mt-0.5">
                             {m.suggestedItems?.[0]}
                           </p>
                         </div>
@@ -838,123 +1041,138 @@ const Dashboard = () => {
             </div>
           )}
 
-         {/* ================= TAB 4: PROGRESS ANALYTICS & CHARTS ================= */}
-{activeTab === "analytics" && (
-  <div className="space-y-8">
-    {/* Top Summary Cards */}
-    <div className="grid md:grid-cols-3 gap-4">
-      <div className="p-6 rounded-3xl bg-gradient-to-br from-violet-950/40 via-[#101015] to-[#101015] border border-violet-500/30">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-violet-300 font-bold uppercase tracking-wider">Consistency Score</span>
-          <Award size={18} className="text-violet-400" />
-        </div>
-        <h3 className="text-3xl font-extrabold text-white mt-3">{analytics?.weeklyAvgScore || 0}%</h3>
-        <p className="text-xs text-zinc-400 mt-1">7-Day Composite Adherence Index</p>
-      </div>
+          {/* ================= TAB 4: PROGRESS ANALYTICS & CHARTS (RECHARTS) ================= */}
+          {activeTab === "analytics" && (
+            <div className="space-y-8">
+              {/* Top Summary Cards */}
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="p-6 rounded-3xl bg-gradient-to-br from-violet-950/40 via-[#101015] to-[#101015] border border-violet-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-violet-300 font-bold uppercase tracking-wider">Consistency Score</span>
+                    <Award size={18} className="text-violet-400" />
+                  </div>
+                  <h3 className="text-3xl font-extrabold text-white mt-3">{analytics?.weeklyAvgScore || 0}%</h3>
+                  <p className="text-xs text-zinc-400 mt-1">7-Day Composite Adherence Index</p>
+                </div>
 
-      <div className="p-6 rounded-3xl bg-gradient-to-br from-orange-950/30 via-[#101015] to-[#101015] border border-orange-500/30">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-orange-300 font-bold uppercase tracking-wider">Active Streak</span>
-          <span className="text-base">🔥</span>
-        </div>
-        <h3 className="text-3xl font-extrabold text-white mt-3">{analytics?.streak || 1} Days</h3>
-        <p className="text-xs text-zinc-400 mt-1">Consecutive days reaching daily targets</p>
-      </div>
+                <div className="p-6 rounded-3xl bg-gradient-to-br from-orange-950/30 via-[#101015] to-[#101015] border border-orange-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-orange-300 font-bold uppercase tracking-wider">Active Habit Streak</span>
+                    <span className="text-base">🔥</span>
+                  </div>
+                  <h3 className="text-3xl font-extrabold text-white mt-3">{analytics?.streak ?? 0} Days</h3>
+                  <p className="text-xs text-zinc-400 mt-1">Consecutive days reaching daily targets</p>
+                </div>
 
-      <div className="p-6 rounded-3xl bg-gradient-to-br from-emerald-950/30 via-[#101015] to-[#101015] border border-emerald-500/30">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-emerald-300 font-bold uppercase tracking-wider">Body Delta</span>
-          <Scale size={18} className="text-emerald-400" />
-        </div>
-        <h3 className="text-3xl font-extrabold text-white mt-3">
-          {Math.abs((profile.currentWeight || 67) - (profile.targetWeight || 50))} kg
-        </h3>
-        <p className="text-xs text-zinc-400 mt-1">Remaining until target weight</p>
-      </div>
-    </div>
+                <div className="p-6 rounded-3xl bg-gradient-to-br from-emerald-950/30 via-[#101015] to-[#101015] border border-emerald-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-emerald-300 font-bold uppercase tracking-wider">Body Delta</span>
+                    <Scale size={18} className="text-emerald-400" />
+                  </div>
+                  <h3 className="text-3xl font-extrabold text-white mt-3">
+                    {Math.abs((profile.currentWeight || 67) - (profile.targetWeight || 50))} kg
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-1">Remaining until target weight achieved</p>
+                </div>
+              </div>
 
-    {/* Interactive Recharts 7-Day Adherence Curve */}
-    <div className="p-6 rounded-3xl bg-[#101015]/80 border border-white/[0.08] backdrop-blur-2xl">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h3 className="text-base font-bold text-white">7-Day Adherence Velocity</h3>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Daily combined score: Workout (50%), Nutrition (35%), Hydration (15%)
-          </p>
-        </div>
-        <span className="text-xs font-mono text-violet-400 bg-violet-500/10 border border-violet-500/20 px-3 py-1 rounded-full">
-          Target: 80%+
-        </span>
-      </div>
+              {/* Interactive Recharts 7-Day Adherence Curve */}
+              <div className="p-6 rounded-3xl bg-[#101015]/80 border border-white/[0.08] backdrop-blur-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-base font-bold text-white">7-Day Adherence Velocity</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Daily combined score: Workout (50%), Nutrition (35%), Hydration (15%)
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono text-violet-400 bg-violet-500/10 border border-violet-500/20 px-3 py-1 rounded-full">
+                    Target: 80%+
+                  </span>
+                </div>
 
-      <div className="h-64 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={analytics?.weeklyTrend || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="habitGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0a" vertical={false} />
-            <XAxis dataKey="day" stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} />
-            <YAxis stroke="#71717a" fontSize={11} tickLine={false} axisLine={false} domain={[0, 100]} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#121218",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "12px",
-                fontSize: "12px",
-                color: "#fff",
-              }}
-              formatter={(value) => [`${value}%`, "Habit Score"]}
-            />
-            <Area
-              type="monotone"
-              dataKey="habitScore"
-              stroke="#a855f7"
-              strokeWidth={3}
-              fillOpacity={1}
-              fill="url(#habitGradient)"
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={analytics?.weeklyTrend || []}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="habitGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0a" vertical={false} />
+                      <XAxis
+                        dataKey="day"
+                        stroke="#71717a"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        stroke="#71717a"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        domain={[0, 100]}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#121218",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: "12px",
+                          fontSize: "12px",
+                          color: "#fff",
+                        }}
+                        formatter={(value) => [`${value}%`, "Habit Score"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="habitScore"
+                        stroke="#a855f7"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#habitGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
 
-    {/* Weight Logging Card */}
-    <div className="p-6 rounded-3xl bg-[#101015]/80 border border-white/[0.08] backdrop-blur-2xl">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div>
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <Scale size={18} className="text-emerald-400" /> Log Daily Weight
-          </h3>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Current: <strong className="text-white">{profile.currentWeight} kg</strong> • BMI:{" "}
-            <strong className="text-emerald-400">{profile.bmi}</strong>
-          </p>
-        </div>
+              {/* Weight Logging Card */}
+              <div className="p-6 rounded-3xl bg-[#101015]/80 border border-white/[0.08] backdrop-blur-2xl">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <Scale size={18} className="text-emerald-400" /> Log Daily Weight
+                    </h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Current: <strong className="text-white">{profile.currentWeight} kg</strong> • BMI:{" "}
+                      <strong className="text-emerald-400">{profile.bmi}</strong>
+                    </p>
+                  </div>
 
-        <form onSubmit={handleLogWeight} className="flex items-center gap-2">
-          <input
-            type="number"
-            step="0.1"
-            placeholder="e.g. 66.5"
-            value={newWeightInput}
-            onChange={(e) => setNewWeightInput(e.target.value)}
-            className="w-28 h-10 rounded-xl bg-black/40 border border-white/[0.1] px-3 text-xs text-white outline-none focus:border-emerald-500 font-mono"
-          />
-          <button
-            type="submit"
-            className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition cursor-pointer"
-          >
-            Update Weight
-          </button>
-        </form>
-      </div>
-    </div>
-  </div>
-)}
+                  <form onSubmit={handleLogWeight} className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      placeholder="e.g. 66.5"
+                      value={newWeightInput}
+                      onChange={(e) => setNewWeightInput(e.target.value)}
+                      className="w-28 h-10 rounded-xl bg-black/40 border border-white/[0.1] px-3 text-xs text-white outline-none focus:border-emerald-500 font-mono"
+                    />
+                    <button
+                      type="submit"
+                      className="h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition cursor-pointer"
+                    >
+                      Update Weight
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>
