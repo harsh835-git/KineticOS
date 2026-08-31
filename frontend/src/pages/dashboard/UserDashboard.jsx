@@ -29,6 +29,7 @@ import {
   Award,
   Repeat,
   Check,
+  ArrowRight,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -61,6 +62,16 @@ const Dashboard = () => {
     dayName: "",
     suggestions: [],
   });
+
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState([
+    {
+      sender: "coach",
+      text: `Hey ${data?.user?.name || "there"}! I'm your Kinetic AI Coach. How's today's training or nutrition feeling?`,
+    },
+  ]);
 
   const fetchDashboardAndLogs = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -168,6 +179,43 @@ const Dashboard = () => {
       setUpdating(false);
     }
   };
+
+  const handleSendMessage = async (customText = null) => {
+  const textToSend = customText || chatInput;
+  if (!textToSend.trim() || chatLoading) return;
+
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const userId = storedUser.id || storedUser._id;
+
+  const newMessages = [...chatMessages, { sender: "user", text: textToSend }];
+  setChatMessages(newMessages);
+  if (!customText) setChatInput("");
+  setChatLoading(true);
+
+  try {
+    const res = await fetch("http://localhost:5000/api/coach/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        message: textToSend,
+        history: newMessages,
+      }),
+    });
+    const result = await res.json();
+    if (result.success) {
+      setChatMessages((prev) => [...prev, { sender: "coach", text: result.reply }]);
+    }
+  } catch (err) {
+    console.error("Chat Error:", err);
+    setChatMessages((prev) => [
+      ...prev,
+      { sender: "coach", text: "Connection error. Make sure backend is active." },
+    ]);
+  } finally {
+    setChatLoading(false);
+  }
+};
 
   // Toggle Exercise Check-off
   const handleToggleExercise = async (exerciseName) => {
@@ -392,7 +440,7 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#050507] text-white flex relative overflow-x-hidden">
+    <div className="max-h-screen bg-[#050507] text-white flex relative overflow-x-hidden">
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute -top-48 -left-48 w-[550px] h-[550px] rounded-full bg-violet-700/10 blur-[160px]" />
@@ -405,85 +453,7 @@ const Dashboard = () => {
           <p className="text-xs font-semibold text-zinc-300 tracking-wider uppercase">Updating KineticOS Matrix...</p>
         </div>
       )}
-
-      {/* ================= SMART SWAP MODAL (GEMINI GEN AI) ================= */}
-      {swapModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#0e0e14] border border-white/[0.1] rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-            <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
-                  <Repeat size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Smart {swapData.type === "exercise" ? "Exercise" : "Meal"} Swap</h3>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">
-                    Synthesizing identical metabolic & biomechanical outputs
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSwapModalOpen(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.05]"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Current Item Preview */}
-            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-5">
-              <span className="text-[10px] uppercase font-bold text-zinc-500">Currently Replacing:</span>
-              <p className="text-xs font-semibold text-zinc-200 mt-0.5">
-                {swapData.type === "exercise"
-                  ? `${swapData.currentItem?.name} (${swapData.currentItem?.sets} × ${swapData.currentItem?.reps})`
-                  : `${swapData.currentItem?.mealName} (${swapData.currentItem?.calories} kcal)`}
-              </p>
-            </div>
-
-            {/* AI Generated Suggestions */}
-            {swapLoading ? (
-              <div className="py-12 flex flex-col items-center justify-center gap-3">
-                <RefreshCw className="animate-spin text-violet-400" size={26} />
-                <p className="text-xs text-zinc-400">Synthesizing 3 precision alternatives via Gemini...</p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                {swapData.suggestions.map((item, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => handleApplySwap(item)}
-                    className="p-4 rounded-2xl bg-white/[0.025] border border-white/[0.06] hover:border-violet-500/50 hover:bg-violet-950/20 transition cursor-pointer flex items-center justify-between group"
-                  >
-                    <div>
-                      <p className="text-xs font-bold text-white group-hover:text-violet-300 transition">
-                        {swapData.type === "exercise" ? item.name : item.mealName}
-                      </p>
-                      {swapData.type === "exercise" ? (
-                        <p className="text-[10px] text-zinc-500 mt-0.5">
-                          {item.equipment} • {item.formGuidance}
-                        </p>
-                      ) : (
-                        <p className="text-[10px] text-zinc-500 mt-0.5">
-                          {item.suggestedItems?.join(", ")}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0 ml-3">
-                      <span className="text-xs font-mono font-bold text-violet-400">
-                        {swapData.type === "exercise"
-                          ? `${item.sets} × ${item.reps}`
-                          : `${item.calories} kcal`}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ================= COMPACT & EXPANDABLE SIDEBAR ================= */}
+       {/* ================= COMPACT & EXPANDABLE SIDEBAR ================= */}
       <aside
         className={`h-screen sticky top-0 bg-[#09090c]/95 border-r border-white/[0.06] backdrop-blur-2xl flex flex-col justify-between py-5 z-40 shrink-0 transition-all duration-300 ease-in-out ${
           sidebarOpen ? "w-64 px-4" : "w-16 px-2 items-center"
@@ -641,6 +611,190 @@ const Dashboard = () => {
           </button>
         </div>
       </aside>
+
+      {/* ================= SMART SWAP MODAL (GEMINI GEN AI) ================= */}
+      {swapModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#0e0e14] border border-white/[0.1] rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
+                  <Repeat size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Smart {swapData.type === "exercise" ? "Exercise" : "Meal"} Swap</h3>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">
+                    Synthesizing identical metabolic & biomechanical outputs
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSwapModalOpen(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.05]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Current Item Preview */}
+            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-5">
+              <span className="text-[10px] uppercase font-bold text-zinc-500">Currently Replacing:</span>
+              <p className="text-xs font-semibold text-zinc-200 mt-0.5">
+                {swapData.type === "exercise"
+                  ? `${swapData.currentItem?.name} (${swapData.currentItem?.sets} × ${swapData.currentItem?.reps})`
+                  : `${swapData.currentItem?.mealName} (${swapData.currentItem?.calories} kcal)`}
+              </p>
+            </div>
+
+            {/* AI Generated Suggestions */}
+            {swapLoading ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3">
+                <RefreshCw className="animate-spin text-violet-400" size={26} />
+                <p className="text-xs text-zinc-400">Synthesizing 3 precision alternatives via Gemini...</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                {swapData.suggestions.map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleApplySwap(item)}
+                    className="p-4 rounded-2xl bg-white/[0.025] border border-white/[0.06] hover:border-violet-500/50 hover:bg-violet-950/20 transition cursor-pointer flex items-center justify-between group"
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-white group-hover:text-violet-300 transition">
+                        {swapData.type === "exercise" ? item.name : item.mealName}
+                      </p>
+                      {swapData.type === "exercise" ? (
+                        <p className="text-[10px] text-zinc-500 mt-0.5">
+                          {item.equipment} • {item.formGuidance}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-zinc-500 mt-0.5">
+                          {item.suggestedItems?.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      <span className="text-xs font-mono font-bold text-violet-400">
+                        {swapData.type === "exercise"
+                          ? `${item.sets} × ${item.reps}`
+                          : `${item.calories} kcal`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+     
+
+       {/* ================= FLOATING AI COACH TRIGGER & DRAWER ================= */}
+        {/* Floating Action Button */}
+        <button
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className="fixed bottom-6 right-6 z-40 px-4 py-3 rounded-full bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white font-bold text-xs shadow-[0_0_25px_rgba(139,92,246,0.45)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer border border-violet-400/30"
+        >
+          <Sparkles size={16} className="animate-pulse" />
+          <span>Ask Kinetic Coach</span>
+        </button>
+
+        {/* Slide-out AI Coach Drawer */}
+        {isChatOpen && (
+          <div className="fixed bottom-20 right-6 z-50 w-full max-w-sm sm:max-w-md h-[520px] bg-[#0e0e14]/95 border border-white/[0.1] rounded-3xl shadow-2xl backdrop-blur-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
+            {/* Drawer Header */}
+            <div className="p-4 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.02]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
+                  <Activity size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    Kinetic Coach <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  </h4>
+                  <p className="text-[10px] text-zinc-400">Context-Aware AI Assistant</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsChatOpen(false)}
+                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.05]"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Quick Prompt Chips */}
+            <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto border-b border-white/[0.04] scrollbar-none bg-black/20">
+              {[
+                "Quick 20-min workout tweak?",
+                "High protein snack ideas?",
+                "Fix lower back tightness",
+              ].map((chip, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSendMessage(chip)}
+                  className="text-[10px] whitespace-nowrap px-2.5 py-1 rounded-full bg-white/[0.03] hover:bg-violet-500/20 hover:text-violet-300 border border-white/[0.06] text-zinc-400 transition"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            {/* Chat Messages */}
+            <div className="flex-1 p-4 overflow-y-auto space-y-3">
+              {chatMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
+                      msg.sender === "user"
+                        ? "bg-violet-600 text-white rounded-br-none"
+                        : "bg-white/[0.04] border border-white/[0.07] text-zinc-200 rounded-bl-none"
+                    }`}
+                  >
+                    <p className="whitespace-pre-line">{msg.text}</p>
+                  </div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07] text-xs text-zinc-400 flex items-center gap-2">
+                    <RefreshCw size={12} className="animate-spin text-violet-400" />
+                    Kinetic Coach is analyzing...
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input Box */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendMessage();
+              }}
+              className="p-3 border-t border-white/[0.06] bg-black/40 flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Ask about exercises, form, macros..."
+                className="flex-1 h-10 rounded-xl bg-white/[0.03] border border-white/[0.08] px-3 text-xs text-white outline-none focus:border-violet-500"
+              />
+              <button
+                type="submit"
+                disabled={chatLoading || !chatInput.trim()}
+                className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center transition disabled:opacity-40 cursor-pointer"
+              >
+                <ArrowRight size={16} />
+              </button>
+            </form>
+          </div>
+        )}
 
       {/* ================= MAIN CONTENT AREA ================= */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -1140,6 +1294,8 @@ const Dashboard = () => {
                 </div>
               </div>
 
+              
+
               {/* Weight Logging Card */}
               <div className="p-6 rounded-3xl bg-[#101015]/80 border border-white/[0.08] backdrop-blur-2xl">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
@@ -1152,6 +1308,8 @@ const Dashboard = () => {
                       <strong className="text-emerald-400">{profile.bmi}</strong>
                     </p>
                   </div>
+
+
 
                   <form onSubmit={handleLogWeight} className="flex items-center gap-2">
                     <input
