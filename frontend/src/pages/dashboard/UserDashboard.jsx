@@ -30,6 +30,7 @@ import {
   Repeat,
   Check,
   ArrowRight,
+  Play,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -40,6 +41,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import ActiveWorkoutModal from "../../components/ActiveWorkoutModal";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -72,6 +74,8 @@ const Dashboard = () => {
       text: `Hey ${data?.user?.name || "there"}! I'm your Kinetic AI Coach. How's today's training or nutrition feeling?`,
     },
   ]);
+
+  const [isActiveWorkoutOpen, setIsActiveWorkoutOpen] = useState(false);
 
   const fetchDashboardAndLogs = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -835,6 +839,8 @@ const Dashboard = () => {
           </div>
         </header>
 
+        
+
         <main className="flex-1 p-6 lg:p-8 max-w-6xl w-full mx-auto">
           {/* ================= 5 BALANCED METRICS STRIP ================= */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-8">
@@ -918,14 +924,20 @@ const Dashboard = () => {
             <div className="grid lg:grid-cols-2 gap-8">
               {/* Today's Workout Card with Checkboxes and Smart Swap */}
               <div className="rounded-3xl bg-[#101015]/80 border border-white/[0.08] p-6 backdrop-blur-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2 text-violet-400 font-bold text-xs uppercase tracking-wider">
-                    <Dumbbell size={16} /> Today's Training • {currentDay}
-                  </div>
-                  <span className="text-[10px] text-zinc-400 font-mono">
-                    {dailyLog?.completedExercises?.length || 0} / {todayWorkout?.exercises?.length || 0} Done
-                  </span>
-                </div>
+                {/* 🟢 NEW HEADER WITH LIVE SESSION BUTTON */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2 text-violet-400 font-bold text-xs uppercase tracking-wider">
+          <Dumbbell size={16} /> Today's Training • {currentDay}
+        </div>
+        {!todayWorkout?.isRestDay && (
+          <button
+            onClick={() => setIsActiveWorkoutOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:opacity-90 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-violet-900/30 transition cursor-pointer"
+          >
+            <Play size={12} fill="currentColor" /> Start Live Session
+          </button>
+        )}
+      </div>
 
                 <h2 className="text-xl font-bold text-white mb-2">{todayWorkout?.focus || "Rest Day"}</h2>
 
@@ -1332,6 +1344,43 @@ const Dashboard = () => {
             </div>
           )}
         </main>
+       {/* In UserDashboard.jsx where ActiveWorkoutModal is rendered */}
+<ActiveWorkoutModal
+  isOpen={isActiveWorkoutOpen}
+  onClose={() => setIsActiveWorkoutOpen(false)}
+  workoutData={todayWorkout}
+  dayName={currentDay}
+  onSessionComplete={fetchDashboardAndLogs}
+  onExerciseCompleted={async (exerciseName, isDone) => {
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const userId = storedUser.id || storedUser._id;
+    const totalExercises = todayWorkout?.exercises?.length || 4;
+
+    const isAlreadyCompleted = dailyLog?.completedExercises?.includes(exerciseName);
+
+    // Only hit API if state changed
+    if ((isDone && !isAlreadyCompleted) || (!isDone && isAlreadyCompleted)) {
+      try {
+        const res = await fetch("http://localhost:5000/api/log/toggle-exercise", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, exerciseName, totalExercises }),
+        });
+        const result = await res.json();
+        if (result.success) {
+          setDailyLog(result.log);
+
+          // Update the Analytics trend & streak dynamically
+          const analyticsRes = await fetch(`http://localhost:5000/api/log/analytics/${userId}`);
+          const analyticsData = await analyticsRes.json();
+          if (analyticsData.success) setAnalytics(analyticsData);
+        }
+      } catch (err) {
+        console.error("Failed to sync exercise completion:", err);
+      }
+    }
+  }}
+/>
       </div>
     </div>
   );

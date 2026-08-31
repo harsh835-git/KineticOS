@@ -9,6 +9,7 @@ import dietRoutes from "./src/routers/dietRoutes.js"
 import logRoutes from "./src/routers/logRoutes.js"
 import swapRoutes from "./src/routers/swapRoutes.js"
 import coachRoutes from "./src/routers/coachRoutes.js";
+import sessionRoutes from "./src/routers/sessionRoutes.js";
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ app.use("/api/diet",dietRoutes);
 app.use("/api/log",logRoutes);
 app.use("/api/swap", swapRoutes);
 app.use("/api/coach", coachRoutes);
+app.use("/api/session",sessionRoutes);
 
 app.get("/", (req, res) => {
   res.json({
