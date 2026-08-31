@@ -31,6 +31,7 @@ import {
   Check,
   ArrowRight,
   Play,
+  ShoppingCart
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -42,6 +43,8 @@ import {
   CartesianGrid,
 } from "recharts";
 import ActiveWorkoutModal from "../../components/ActiveWorkoutModal";
+import GroceryModal from "../../components/publicModals/groceryModal";
+
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -76,6 +79,7 @@ const Dashboard = () => {
   ]);
 
   const [isActiveWorkoutOpen, setIsActiveWorkoutOpen] = useState(false);
+  const [isGroceryOpen, setIsGroceryOpen] = useState(false);
 
   const fetchDashboardAndLogs = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -1150,7 +1154,23 @@ const Dashboard = () => {
             <div>
               <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h2 className="text-xl font-bold">7-Day Adaptive Nutrition Schedule</h2>
+                  {/* In Tab 3: Weekly Nutrition Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">7-Day Nutritional Blueprint</h2>
+                      <p className="text-xs text-zinc-400">Target: {data?.profile?.targetCalories || 2000} kcal/day</p>
+                    </div>
+
+                    {/* Grocery List & PDF Button */}
+                    <button
+                      onClick={() => setIsGroceryOpen(true)}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:opacity-90 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-violet-900/30 transition cursor-pointer self-start sm:self-auto"
+                    >
+                      <ShoppingCart size={15} />
+                      <span>Smart Grocery & Export PDF</span>
+                    </button>
+                  </div>
+                     <h2 className="text-xl font-bold">7-Day Adaptive Nutrition Schedule</h2>
                   <p className="text-xs text-zinc-400 mt-1 capitalize">
                     {profile.dietaryPreference} • {profile.primaryGoal} ({profile.targetCalories || 2000} kcal/day)
                   </p>
@@ -1205,6 +1225,7 @@ const Dashboard = () => {
                 ))}
               </div>
             </div>
+
           )}
 
           {/* ================= TAB 4: PROGRESS ANALYTICS & CHARTS (RECHARTS) ================= */}
@@ -1345,42 +1366,50 @@ const Dashboard = () => {
           )}
         </main>
        {/* In UserDashboard.jsx where ActiveWorkoutModal is rendered */}
-<ActiveWorkoutModal
-  isOpen={isActiveWorkoutOpen}
-  onClose={() => setIsActiveWorkoutOpen(false)}
-  workoutData={todayWorkout}
-  dayName={currentDay}
-  onSessionComplete={fetchDashboardAndLogs}
-  onExerciseCompleted={async (exerciseName, isDone) => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-    const userId = storedUser.id || storedUser._id;
-    const totalExercises = todayWorkout?.exercises?.length || 4;
+              <ActiveWorkoutModal
+                isOpen={isActiveWorkoutOpen}
+                onClose={() => setIsActiveWorkoutOpen(false)}
+                workoutData={todayWorkout}
+                dayName={currentDay}
+                onSessionComplete={fetchDashboardAndLogs}
+                onExerciseCompleted={async (exerciseName, isDone) => {
+                  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+                  const userId = storedUser.id || storedUser._id;
+                  const totalExercises = todayWorkout?.exercises?.length || 4;
 
-    const isAlreadyCompleted = dailyLog?.completedExercises?.includes(exerciseName);
+                  const isAlreadyCompleted = dailyLog?.completedExercises?.includes(exerciseName);
 
-    // Only hit API if state changed
-    if ((isDone && !isAlreadyCompleted) || (!isDone && isAlreadyCompleted)) {
-      try {
-        const res = await fetch("http://localhost:5000/api/log/toggle-exercise", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, exerciseName, totalExercises }),
-        });
-        const result = await res.json();
-        if (result.success) {
-          setDailyLog(result.log);
+                  // Only hit API if state changed
+                  if ((isDone && !isAlreadyCompleted) || (!isDone && isAlreadyCompleted)) {
+                    try {
+                      const res = await fetch("http://localhost:5000/api/log/toggle-exercise", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ userId, exerciseName, totalExercises }),
+                      });
+                      const result = await res.json();
+                      if (result.success) {
+                        setDailyLog(result.log);
 
-          // Update the Analytics trend & streak dynamically
-          const analyticsRes = await fetch(`http://localhost:5000/api/log/analytics/${userId}`);
-          const analyticsData = await analyticsRes.json();
-          if (analyticsData.success) setAnalytics(analyticsData);
-        }
-      } catch (err) {
-        console.error("Failed to sync exercise completion:", err);
-      }
-    }
-  }}
-/>
+                        // Update the Analytics trend & streak dynamically
+                        const analyticsRes = await fetch(`http://localhost:5000/api/log/analytics/${userId}`);
+                        const analyticsData = await analyticsRes.json();
+                        if (analyticsData.success) setAnalytics(analyticsData);
+                      }
+                    } catch (err) {
+                      console.error("Failed to sync exercise completion:", err);
+                    }
+                  }
+                }}
+              />
+
+          <GroceryModal
+            isOpen={isGroceryOpen}
+            onClose={() => setIsGroceryOpen(false)}
+            fullData={data}
+            userProfile={data?.profile || data?.user}
+            userName={data?.user?.name || "Athelete"}
+          />
       </div>
     </div>
   );
