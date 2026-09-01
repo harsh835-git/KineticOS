@@ -7,8 +7,11 @@ import {
   ShoppingCart,
   Apple,
   Dumbbell,
+  Send,
+  Mail,
+  Check,
 } from "lucide-react";
-import { generateGroceryList } from "../../utils/groceryAggregator";
+import { generateGroceryList,formatGroceryText } from "../../utils/groceryAggregator";
 
 const GroceryModal = ({
   isOpen,
@@ -19,10 +22,13 @@ const GroceryModal = ({
   userProfile,
   userName,
 }) => {
-  if (!isOpen) return null;
+  // 1. All hooks inside component body
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [checkedItems, setCheckedItems] = useState({});
 
-  // 1. Data Normalization
-const root = fullData || {};
+  // 2. Data normalization
+  const root = fullData || {};
   const resolvedDiet =
     dietPlan || root.dietPlan || root.diet || root.mealPlan || root.plan?.dietPlan || root;
   const resolvedWorkout =
@@ -33,9 +39,9 @@ const root = fullData || {};
   const localUser = JSON.parse(localStorage.getItem("user") || "{}");
 
   const resolvedName =
-    userName || resolvedProfile.name || root.user?.name || localUser.name || "Harsh Soni";
+    userName || resolvedProfile.name || root.user?.name || localUser.name || "Athlete";
 
-  // Scan every possible property key for the weight
+  // Biometric Weight Resolution
   const resolvedWeight = (() => {
     const candidates = [
       root.profile?.currentWeight,
@@ -55,13 +61,11 @@ const root = fullData || {};
     const found = candidates.find(
       (val) => val !== undefined && val !== null && val !== "" && val !== "--"
     );
-    return found !== undefined ? found : "70"; // Fallback to recorded metric
+    return found !== undefined ? found : "70";
   })();
 
-  // Robust check for dietary preference: check both root and local storage
-  
-
- const searchValues = [
+  // Robust Non-Veg vs Veg detection
+  const searchValues = [
     root.dietaryPreference,
     root.dietPreference,
     root.foodPreference,
@@ -77,13 +81,12 @@ const root = fullData || {};
     localUser.profile?.dietaryPreference,
   ];
 
-  // Also check if any meal description explicitly contains non-veg items (chicken, egg, salmon, fish, meat)
   const fullTextScan = JSON.stringify(root).toLowerCase();
-  const hasAnimalProteinsInMeals = 
-    fullTextScan.includes("chicken") || 
-    fullTextScan.includes("egg") || 
-    fullTextScan.includes("salmon") || 
-    fullTextScan.includes("fish") || 
+  const hasAnimalProteinsInMeals =
+    fullTextScan.includes("chicken") ||
+    fullTextScan.includes("egg") ||
+    fullTextScan.includes("salmon") ||
+    fullTextScan.includes("fish") ||
     fullTextScan.includes("meat");
 
   const rawPreference =
@@ -91,8 +94,6 @@ const root = fullData || {};
     (hasAnimalProteinsInMeals ? "non-vegetarian" : "vegetarian");
 
   const normalized = rawPreference.toLowerCase();
-
-  // If it contains "non", "omni", "meat", or meals contain chicken/fish/egg -> Non-Vegetarian
   const isNonVeg =
     normalized.includes("non") ||
     normalized.includes("omni") ||
@@ -115,14 +116,16 @@ const root = fullData || {};
     localUser.primaryGoal ||
     "Fitness";
 
-  
+  const userEmail =
+    resolvedProfile.email ||
+    root.user?.email ||
+    localUser.email ||
+    "";
 
   const groceryCategories = useMemo(
     () => generateGroceryList(resolvedDiet, userPreference),
     [resolvedDiet, userPreference]
   );
-
-  const [checkedItems, setCheckedItems] = useState({});
 
   const toggleItem = (itemId) => {
     setCheckedItems((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
@@ -143,7 +146,53 @@ const root = fullData || {};
     resolvedDiet.days ||
     [];
 
-  // Pure Standalone Print Window: Completely isolates printable HTML to allow natural multi-page flow
+  // 1. One-Click WhatsApp Deep Link
+  const handleWhatsAppShare = () => {
+    const text = formatGroceryText(groceryCategories, resolvedName, resolvedCalories);
+    const encodedText = encodeURIComponent(text);
+    const url = `https://api.whatsapp.com/send?text=${encodedText}`;
+    window.open(url, "_blank");
+  };
+
+  // 2. Email Dispatch via Backend API
+  const handleEmailSend = async () => {
+    const targetEmail = prompt("Enter your email address:", userEmail);
+    if (!targetEmail) return;
+
+    try {
+      setEmailSending(true);
+      const groceryText = formatGroceryText(groceryCategories, resolvedName, resolvedCalories);
+      const token = localStorage.getItem("token");
+
+         const response = await fetch("http://localhost:5000/api/plan/send-grocery-email", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+                email: targetEmail,
+                athleteName: resolvedName,
+                groceryText,
+            }),
+        });
+
+      const result = await response.json();
+      if (result.success) {
+        setEmailSent(true);
+        setTimeout(() => setEmailSent(false), 3000);
+      } else {
+        alert(result.message || "Failed to dispatch email.");
+      }
+    } catch (err) {
+      console.error("Dispatch error:", err);
+      alert("Connection error sending email.");
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
+  // 3. Isolated Multi-Page Print Window
   const handlePrint = () => {
     const printWindow = window.open("", "_blank", "width=850,height=1000");
     if (!printWindow) {
@@ -383,11 +432,15 @@ const root = fullData || {};
     printWindow.document.close();
   };
 
+  // Guard after all hooks
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-2xl flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="w-full max-w-4xl bg-[#0d0d12] border border-white/[0.08] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Modal Top Bar */}
-        <div className="p-5 sm:p-6 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02]">
+        
+        {/* Header */}
+        <div className="p-5 sm:p-6 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02] flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
               <ShoppingCart size={20} />
@@ -406,14 +459,37 @@ const root = fullData || {};
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Action Button Strip */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleWhatsAppShare}
+              className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-lg shadow-emerald-950/40"
+              title="Send to WhatsApp"
+            >
+              <Send size={14} />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </button>
+
+            <button
+              onClick={handleEmailSend}
+              disabled={emailSending}
+              className="px-3 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] text-zinc-200 hover:text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer border border-white/[0.08]"
+              title="Send to Email"
+            >
+              {emailSent ? <Check size={14} className="text-emerald-400" /> : <Mail size={14} />}
+              <span className="hidden sm:inline">
+                {emailSent ? "Sent!" : emailSending ? "Sending..." : "Email"}
+              </span>
+            </button>
+
             <button
               onClick={handlePrint}
-              className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shadow-lg shadow-violet-900/30"
+              className="px-3 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-lg shadow-violet-900/30"
             >
-              <Printer size={15} />
-              <span>Export / Print PDF</span>
+              <Printer size={14} />
+              <span className="hidden sm:inline">PDF</span>
             </button>
+
             <button
               onClick={onClose}
               className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] text-zinc-400 hover:text-white transition cursor-pointer"

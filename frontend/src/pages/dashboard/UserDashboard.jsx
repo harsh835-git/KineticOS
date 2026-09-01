@@ -44,6 +44,7 @@ import {
 } from "recharts";
 import ActiveWorkoutModal from "../../components/ActiveWorkoutModal";
 import GroceryModal from "../../components/publicModals/groceryModal";
+import DailyCheckInModal from "../../components/DailyCheckInModal";
 
 
 const Dashboard = () => {
@@ -80,6 +81,9 @@ const Dashboard = () => {
 
   const [isActiveWorkoutOpen, setIsActiveWorkoutOpen] = useState(false);
   const [isGroceryOpen, setIsGroceryOpen] = useState(false);
+
+  const [isCheckInOpen, setIsCheckInOpen] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState(null);
 
   const fetchDashboardAndLogs = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -121,6 +125,24 @@ const Dashboard = () => {
   useEffect(() => {
     fetchDashboardAndLogs();
   }, [navigate]);
+
+  const fetchAnalytics = async () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!user._id) return;
+    const res = await fetch(`http://localhost:5000/api/log/analytics/${user._id}`);
+    const data = await res.json();
+    if (data.success) {
+      setAnalyticsData(data);
+    }
+  } catch (err) {
+    console.error("Failed to load analytics:", err);
+  }
+};
+
+useEffect(() => {
+  fetchAnalytics();
+}, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -697,7 +719,13 @@ const Dashboard = () => {
         </div>
       )}
 
-     
+      <button
+          onClick={() => setIsCheckInOpen(true)}
+          className="fixed bottom-20 right-6 z-40 px-5 py-3 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-2xl shadow-violet-900/60 border border-violet-400/30 transition hover:scale-105"
+        >
+          <Zap size={16} />
+          <span>Check-In</span>
+        </button>
 
        {/* ================= FLOATING AI COACH TRIGGER & DRAWER ================= */}
         {/* Floating Action Button */}
@@ -1409,6 +1437,12 @@ const Dashboard = () => {
             fullData={data}
             userProfile={data?.profile || data?.user}
             userName={data?.user?.name || "Athelete"}
+          />
+
+          <DailyCheckInModal
+            isOpen={isCheckInOpen}
+            onClose={() => setIsCheckInOpen(false)}
+            onCheckInComplete={() => fetchAnalytics()}
           />
       </div>
     </div>

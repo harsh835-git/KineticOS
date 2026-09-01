@@ -116,3 +116,24 @@ export const generateGroceryList = (rawInput, preference = "non-vegetarian") => 
       items: items.sort((a, b) => b.occurrences - a.occurrences),
     }));
 };
+
+
+
+// src/utils/groceryAggregator.js
+
+export const formatGroceryText = (categories, athleteName = "Athlete", calories = 2000) => {
+  let text = `🛒 *KineticOS Smart Grocery Protocol*\n`;
+  text += `👤 Athlete: ${athleteName} (${calories} kcal/day)\n`;
+  text += `📅 Generated on: ${new Date().toLocaleDateString()}\n\n`;
+
+  categories.forEach((cat) => {
+    text += `*${cat.category.toUpperCase()}*\n`;
+    cat.items.forEach((item) => {
+      text += `  • [ ] ${item.name} (${item.occurrences}x in split)\n`;
+    });
+    text += `\n`;
+  });
+
+  text += `⚡ Powered by KineticOS Biometric Engine`;
+  return text;
+};
