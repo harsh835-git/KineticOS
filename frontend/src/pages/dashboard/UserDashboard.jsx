@@ -31,7 +31,10 @@ import {
   Check,
   ArrowRight,
   Play,
-  ShoppingCart
+  ShoppingCart,
+  ShieldAlert,
+  HeartPulse,
+  CalendarCheck,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -85,7 +88,7 @@ const Dashboard = () => {
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [analyticsData, setAnalyticsData] = useState(null);
 
-  const fetchDashboardAndLogs = async () => {
+ const fetchDashboardAndLogs = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
 
@@ -103,46 +106,43 @@ const Dashboard = () => {
 
       const dashData = await dashRes.json();
       const logData = await logRes.json();
-      const analyticsData = await analyticsRes.json();
+      const aData = await analyticsRes.json();
 
-      if (!dashRes.ok) {
-        setError(dashData.message || "Failed to load dashboard data.");
-        setLoading(false);
-        return;
-      }
-
-      setData(dashData);
+      if (dashRes.ok) setData(dashData);
       if (logData.success) setDailyLog(logData.log);
-      if (analyticsData.success) setAnalytics(analyticsData);
+      if (aData.success) {
+        setAnalytics(aData);
+        setAnalyticsData(aData);
+      }
     } catch (err) {
       console.error("Dashboard Fetch Error:", err);
-      setError("Unable to connect to the server.");
+      setError("Unable to connect to the backend server.");
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchAnalytics = async () => {
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const userId = storedUser.id || storedUser._id;
+    if (!userId) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/log/analytics/${userId}`);
+      const aData = await res.json();
+      if (aData.success) {
+        setAnalytics(aData);
+        setAnalyticsData(aData);
+      }
+    } catch (err) {
+      console.error("Failed to refresh analytics:", err);
+    }
+  };
+
+  // Run exactly once on mount
   useEffect(() => {
     fetchDashboardAndLogs();
-  }, [navigate]);
-
-  const fetchAnalytics = async () => {
-  try {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user._id) return;
-    const res = await fetch(`http://localhost:5000/api/log/analytics/${user._id}`);
-    const data = await res.json();
-    if (data.success) {
-      setAnalyticsData(data);
-    }
-  } catch (err) {
-    console.error("Failed to load analytics:", err);
-  }
-};
-
-useEffect(() => {
-  fetchAnalytics();
-}, []);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -469,6 +469,20 @@ useEffect(() => {
     "Improve Endurance",
   ];
 
+  // Safe computation variables
+  const activeAnalytics = analyticsData || analytics;
+
+  const recoveryInfo = activeAnalytics?.recoveryData || {
+    latestEnergy: dailyLog?.energyLevel || "exhausted",
+    forceRecoveryDay: false,
+    guidance: "Optimal metabolic readiness cleared.",
+  };
+
+  const calculatedHabitScore =
+    activeAnalytics?.habitData?.habitScore ??
+    activeAnalytics?.weeklyAvgScore ??
+    dailyLog?.habitScore ??
+    0;
   return (
     <div className="max-h-screen bg-[#050507] text-white flex relative overflow-x-hidden">
       {/* Background Ambience */}
@@ -950,6 +964,41 @@ useEffect(() => {
               </div>
             </div>
           </div>
+
+          {/* ================= RECOVERY & ADAPTIVE ALERT BANNER ================= */}
+<div className="mb-6 p-4 rounded-3xl bg-gradient-to-r from-violet-950/40 via-[#111118] to-[#111118] border border-violet-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+  <div className="flex items-start sm:items-center gap-3.5">
+    <div className={`p-2.5 rounded-2xl border shrink-0 ${
+      recoveryInfo.forceRecoveryDay
+        ? "bg-rose-500/20 border-rose-500/40 text-rose-300"
+        : "bg-violet-600/20 border-violet-500/40 text-violet-300"
+    }`}>
+      {recoveryInfo.forceRecoveryDay ? <ShieldAlert size={20} /> : <HeartPulse size={20} />}
+    </div>
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold text-white">
+          Recovery State: {recoveryInfo.latestEnergy}
+        </span>
+        {recoveryInfo.forceRecoveryDay && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold">
+            Recovery Forced
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-zinc-400 mt-0.5">{recoveryInfo.guidance}</p>
+    </div>
+  </div>
+
+  <div className="flex items-center gap-3 shrink-0">
+    <div className="px-3.5 py-1.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-right">
+      <span className="text-[10px] text-zinc-500 uppercase font-mono block">Projected Completion</span>
+      <span className="text-xs font-bold text-emerald-400 font-mono flex items-center gap-1 justify-end">
+        <CalendarCheck size={12} /> {profile.goalForecastDate || "Dynamic Calibration Active"}
+      </span>
+    </div>
+  </div>
+</div>
 
           {/* ================= TAB 1: TODAY'S OVERVIEW ================= */}
           {activeTab === "overview" && (
@@ -1439,11 +1488,15 @@ useEffect(() => {
             userName={data?.user?.name || "Athelete"}
           />
 
-          <DailyCheckInModal
-            isOpen={isCheckInOpen}
-            onClose={() => setIsCheckInOpen(false)}
-            onCheckInComplete={() => fetchAnalytics()}
-          />
+        <DailyCheckInModal
+          isOpen={isCheckInOpen}
+          onClose={() => setIsCheckInOpen(false)}
+          userId={user?._id || user?.id}
+          onCheckInComplete={() => {
+            fetchAnalytics();
+            fetchDashboardAndLogs();
+          }}
+        />
       </div>
     </div>
   );

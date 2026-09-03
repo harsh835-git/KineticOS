@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 const DailyCheckInModal = ({ isOpen, onClose, userId, onCheckInComplete }) => {
+  const [loading, setLoading] = useState(false);
   const [energyLevel, setEnergyLevel] = useState("Normal");
   const [workoutStatus, setWorkoutStatus] = useState("Completed");
   const [dietStatus, setDietStatus] = useState("Followed");
@@ -37,78 +38,62 @@ const DailyCheckInModal = ({ isOpen, onClose, userId, onCheckInComplete }) => {
     { level: "Very Tired", icon: BatteryWarning, label: "Exhausted", desc: "High central fatigue" },
   ];
 
-  const handleSubmit = async (e) => {
+ const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
+
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const resolvedUserId =
+      userId ||
+      storedUser._id ||
+      storedUser.id ||
+      storedUser.user?._id ||
+      storedUser.user?.id;
+
+    if (!resolvedUserId) {
+      alert("User session not found. Please log in again.");
+      return;
+    }
+
+    // Sanitize payload to avoid Mongoose validation 400 errors
+    const payload = {
+      userId: resolvedUserId,
+      energyLevel: energyLevel || "Normal",
+      workoutStatus: workoutStatus || "Completed",
+      dietStatus: dietStatus || "Followed",
+    };
+
+    if (weight && !isNaN(Number(weight)) && Number(weight) > 0) {
+      payload.weight = Number(weight);
+    }
+
+    if (notes && typeof notes === "string" && notes.trim().length > 0) {
+      payload.notes = notes.trim();
+    }
 
     try {
-      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-      const activeUserId = userId || storedUser._id || storedUser.id;
-
-      if (!activeUserId) {
-        alert("User session not found. Please log in again.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Sanitize measurements to prevent sending empty strings
-      let cleanMeasurements = undefined;
-      if (showMeasurements) {
-        const temp = {};
-        Object.entries(measurements).forEach(([key, val]) => {
-          if (val !== "" && val !== undefined && val !== null && !isNaN(parseFloat(val))) {
-            temp[key] = parseFloat(val);
-          }
-        });
-        if (Object.keys(temp).length > 0) {
-          cleanMeasurements = temp;
-        }
-      }
-
-      const payload = {
-        userId: activeUserId,
-        energyLevel,
-        workoutStatus,
-        dietStatus,
-      };
-
-      if (weight && weight !== "" && !isNaN(parseFloat(weight))) {
-        payload.weight = parseFloat(weight);
-      }
-
-      if (cleanMeasurements) {
-        payload.measurements = cleanMeasurements;
-      }
-
-      if (notes && notes.trim()) {
-        payload.notes = notes.trim();
-      }
-
-      const token = localStorage.getItem("token");
+      setLoading(true);
       const res = await fetch("http://localhost:5000/api/log/check-in", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       const data = await res.json();
-      if (res.ok && data.success) {
-        if (onCheckInComplete) onCheckInComplete(data.log);
-        onClose();
-      } else {
-        alert(data.message || "Failed to submit check-in log.");
+
+      if (!res.ok || !data.success) {
+        alert(data.message || "Failed to log check-in.");
+        return;
       }
+
+      if (onCheckInComplete) onCheckInComplete();
+      onClose();
     } catch (err) {
-      console.error("Check-in error:", err);
-      alert(`Network error: ${err.message}. Ensure backend is running.`);
+      console.error("Check-in submission error:", err);
+      alert("Server connection failed while saving check-in.");
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
-
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-2xl flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="w-full max-w-xl bg-[#0d0d12] border border-white/[0.08] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">

@@ -44,9 +44,50 @@ const dailyLogSchema = new mongoose.Schema(
       min: 0,
       max: 100,
     },
-    loggedWeight: { type: Number, default: null },
+    // Unified weight fields
+    weight: {
+      type: Number,
+      default: null,
+    },
+    loggedWeight: {
+      type: Number,
+      default: null,
+    },
+
+    // Daily Biometric Check-In fields
+    energyLevel: {
+      type: String,
+      enum: [
+        "Energized",
+        "Normal",
+        "Fatigued",
+        "Exhausted",
+        "Slightly Fatigued",
+        "Very Tired",
+      ],
+      default: "Normal",
+    },
+    workoutStatus: {
+      type: String,
+      enum: ["Completed", "Partial", "Skipped"],
+      default: "Completed",
+    },
+    dietStatus: {
+      type: String,
+      enum: ["Followed", "Mostly", "Deviated"],
+      default: "Followed",
+    },
+    measurements: {
+      type: Map,
+      of: Number,
+      default: {},
+    },
+    notes: {
+      type: String,
+      default: "",
+    },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 // Compound index so one user only has one log document per calendar day
