@@ -34,16 +34,13 @@ router.get("/analytics/:userId", async (req, res) => {
     const habitData = KineticEngine.calculateHabitScore(logs);
     const recoveryData = KineticEngine.evaluateRecovery(logs);
 
-    const weeklyTrend = logs.slice(-7).map((log) => ({
+    // Explicitly define both latestLog and last7Logs
+    const latestLog = logs.length ? logs[logs.length - 1] : null;
+    const last7Logs = logs.slice(-7);
+
+    const weeklyTrend = last7Logs.map((log) => ({
       day: log.dayName ? log.dayName.slice(0, 3) : "Day",
-      habitScore:
-        log.workoutStatus === "Completed" && log.dietStatus === "Followed"
-          ? 100
-          : log.workoutStatus === "Completed" || log.dietStatus === "Followed"
-          ? 75
-          : log.workoutStatus === "Partial" || log.dietStatus === "Mostly"
-          ? 50
-          : 20,
+      habitScore: KineticEngine.getDailyScore(log),
     }));
 
     return res.status(200).json({
@@ -53,7 +50,9 @@ router.get("/analytics/:userId", async (req, res) => {
       weeklyAvgScore: habitData.habitScore,
       habitData,
       recoveryData,
-      weeklyTrend: weeklyTrend.length ? weeklyTrend : [{ day: "Today", habitScore: habitData.habitScore }],
+      weeklyTrend: weeklyTrend.length
+        ? weeklyTrend
+        : [{ day: "Today", habitScore: habitData.habitScore || 0 }],
     });
   } catch (error) {
     console.error("Analytics error:", error);

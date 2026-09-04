@@ -1,18 +1,43 @@
-// backend/src/utils/kineticEngine.js
-
 export class KineticEngine {
+  /**
+   * Calculates points for a single log entry: (Workout * 0.60) + (Diet * 0.40)
+   */
+  static getDailyScore(log) {
+    if (!log) return 0;
+
+    let workoutPts = 0;
+    if (log.workoutStatus === "Completed") workoutPts = 100;
+    else if (log.workoutStatus === "Partial") workoutPts = 50;
+
+    let dietPts = 20;
+    if (log.dietStatus === "Followed") dietPts = 100;
+    else if (log.dietStatus === "Mostly") dietPts = 60;
+
+    return Math.round(workoutPts * 0.6 + dietPts * 0.4);
+  }
+
+  /**
+   * 14-day rolling window habit adherence computation
+   */
   static calculateHabitScore(logs = []) {
     if (!logs || !logs.length) {
       return { habitScore: 0, workoutAdherence: 0, dietAdherence: 0, dropOffRisk: false };
     }
 
-    const recentLogs = logs.slice(-14);
+    // Sort ascending (oldest to newest) to process rolling window and streaks accurately
+    const sortedAsc = [...logs].sort((a, b) => {
+      const dateA = new Date(a.dateString || a.createdAt || a.updatedAt);
+      const dateB = new Date(b.dateString || b.createdAt || b.updatedAt);
+      return dateA - dateB;
+    });
+
+    // Grab the most recent 14 calendar records
+    const recentLogs = sortedAsc.slice(-14);
     let workoutPoints = 0;
     let dietPoints = 0;
     let consecutiveMissed = 0;
 
     recentLogs.forEach((log) => {
-      // Workout points
       if (log.workoutStatus === "Completed") {
         workoutPoints += 100;
         consecutiveMissed = 0;
@@ -23,7 +48,6 @@ export class KineticEngine {
         consecutiveMissed++;
       }
 
-      // Diet points
       if (log.dietStatus === "Followed") {
         dietPoints += 100;
       } else if (log.dietStatus === "Mostly") {
@@ -45,7 +69,11 @@ export class KineticEngine {
       dropOffRisk,
     };
   }
-static evaluateRecovery(logs = []) {
+
+  /**
+   * 7-day fatigue monitoring and recovery state evaluation
+   */
+  static evaluateRecovery(logs = []) {
     if (!logs || !logs.length) {
       return {
         latestEnergy: "Normal",
@@ -55,18 +83,18 @@ static evaluateRecovery(logs = []) {
       };
     }
 
-    // Always sort by date / updatedAt descending to ensure index 0 is the newest
-    const sortedLogs = [...logs].sort((a, b) => {
+    // Sort descending (newest first)
+    const sortedDesc = [...logs].sort((a, b) => {
       const dateA = new Date(a.updatedAt || a.dateString || a.createdAt);
       const dateB = new Date(b.updatedAt || b.dateString || b.createdAt);
       return dateB - dateA;
     });
 
-    const latestLog = sortedLogs[0];
+    const latestLog = sortedDesc[0];
     const latestEnergy = latestLog?.energyLevel || "Normal";
 
-    // Check rolling 7 days for fatigue accumulation
-    const last7Logs = sortedLogs.slice(0, 7);
+    // 7-day fatigue window
+    const last7Logs = sortedDesc.slice(0, 7);
     const fatigueFlags = ["Fatigued", "Exhausted", "Slightly Fatigued", "Very Tired"];
     const fatigueCount = last7Logs.filter((l) => fatigueFlags.includes(l.energyLevel)).length;
 
@@ -90,4 +118,46 @@ static evaluateRecovery(logs = []) {
       guidance,
     };
   }
+
+
+  /**
+   * Modulates workout exercises dynamically based on recovery status.
+   * If forced recovery or high fatigue is active, reduce volume and mark recovery tags.
+   */
+  static modulateWorkout(exercises = [], recoveryData = {}) {
+    if (!exercises || !exercises.length) return [];
+
+    const isForced = recoveryData.forceRecoveryDay;
+    const isFatigued =
+      recoveryData.latestEnergy === "Exhausted" ||
+      recoveryData.latestEnergy === "Very Tired";
+
+    if (!isForced && !isFatigued) {
+      return exercises.map((ex) => ({
+        ...ex,
+        isModulated: false,
+        displaySets: ex.sets,
+        displayReps: ex.reps,
+      }));
+    }
+
+    return exercises.map((ex) => {
+      const originalSets = parseInt(ex.sets, 10) || 3;
+      // Halve sets on forced recovery (min 1-2 sets), reduce by 1 on moderate fatigue
+      const reducedSets = isForced
+        ? Math.max(1, Math.floor(originalSets / 2))
+        : Math.max(2, originalSets - 1);
+
+      return {
+        ...ex,
+        isModulated: true,
+        originalSets: ex.sets,
+        displaySets: `${reducedSets}`,
+        displayReps: isForced ? "10-12 (RPE 6 Active Flush)" : ex.reps,
+        modulationTag: isForced ? "Deload Active" : "Volume Scaled -20%",
+      };
+    });
+  }
 }
+
+

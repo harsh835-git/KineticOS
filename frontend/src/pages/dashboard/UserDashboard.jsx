@@ -483,6 +483,31 @@ const Dashboard = () => {
     activeAnalytics?.weeklyAvgScore ??
     dailyLog?.habitScore ??
     0;
+
+    
+  const isDeloadActive =
+    activeAnalytics?.recoveryData?.forceRecoveryDay ||
+    activeAnalytics?.recoveryData?.latestEnergy === "Exhausted";
+
+    const workoutSchedule =
+  data?.workoutPlan?.schedule ||
+  data?.weeklyWorkoutPlan?.schedule ||
+  data?.workoutRoutine?.schedule ||
+  data?.plan?.workoutPlan?.schedule ||
+  data?.schedule ||
+  [];
+
+  const currentExercises = (data?.workoutPlan || []).map((ex) => {
+    if (!isDeloadActive) return ex;
+    const originalSets = parseInt(ex.sets, 10) || 3;
+    return {
+      ...ex,
+      isModulated: true,
+      sets: Math.max(1, Math.floor(originalSets / 2)),
+      reps: "10-12 (Active Deload)",
+      tag: "Deload Active",
+    };
+  });
   return (
     <div className="max-h-screen bg-[#050507] text-white flex relative overflow-x-hidden">
       {/* Background Ambience */}
@@ -1170,61 +1195,107 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* ================= TAB 2: FULL 7-DAY WORKOUT ================= */}
-          {activeTab === "workout" && (
-            <div>
-              <div className="mb-6">
-                <h2 className="text-xl font-bold">7-Day Progressive Workout Routine</h2>
-                <p className="text-xs text-zinc-400 mt-1">
-                  Tailored for {profile.primaryGoal} ({profile.experienceLevel} level).
-                </p>
+   {/* ================= TAB 2: FULL 7-DAY WORKOUT ================= */}
+{activeTab === "workout" && (() => {
+  const activeAnalytics = analyticsData || analytics;
+  const currentEnergy =
+    activeAnalytics?.recoveryData?.latestEnergy ||
+    dailyLog?.energyLevel ||
+    "Normal";
+
+  const isForcedDeload = activeAnalytics?.recoveryData?.forceRecoveryDay === true;
+  const isExhausted = currentEnergy === "Exhausted" || currentEnergy === "Very Tired";
+  const isFatigued = currentEnergy === "Fatigued" || currentEnergy === "Slightly Fatigued";
+
+  const scheduleList =
+    weeklyWorkoutPlan?.schedule ||
+    data?.workoutPlan?.schedule ||
+    data?.schedule ||
+    [];
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-white">7-Day Progressive Workout Routine</h2>
+        <p className="text-xs text-zinc-400 mt-1">
+          Tailored for {profile?.primaryGoal || "Muscle Gain"} ({profile?.experienceLevel || "beginner"} level).
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {scheduleList.map((day) => {
+          const isToday =
+            day.dayName?.trim().toLowerCase() === currentDay?.trim().toLowerCase();
+
+          return (
+            <div
+              key={day.dayName}
+              className={`p-5 rounded-2xl border transition ${
+                isToday
+                  ? "bg-violet-950/20 border-violet-500/50 shadow-lg shadow-violet-900/20"
+                  : "bg-white/[0.02] border-white/[0.06]"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-white">{day.dayName}</span>
+                {isToday && (
+                  <span className="text-[9px] bg-violet-500 text-white font-bold px-2 py-0.5 rounded-full">
+                    TODAY
+                  </span>
+                )}
               </div>
 
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {weeklyWorkoutPlan?.schedule?.map((day) => (
-                  <div
-                    key={day.dayName}
-                    className={`p-5 rounded-2xl border transition ${
-                      day.dayName === currentDay
-                        ? "bg-violet-950/20 border-violet-500/50 shadow-lg shadow-violet-900/20"
-                        : "bg-white/[0.02] border-white/[0.06]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-white">{day.dayName}</span>
-                      {day.dayName === currentDay && (
-                        <span className="text-[9px] bg-violet-500 text-white font-bold px-2 py-0.5 rounded-full">
-                          TODAY
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-violet-300 font-semibold mb-3">{day.focus}</p>
-                    {day.isRestDay ? (
-                      <p className="text-[11px] text-zinc-500 italic">Active rest & muscle repair</p>
-                    ) : (
-                      <ul className="space-y-2 text-xs text-zinc-400">
-                        {day.exercises?.map((e, idx) => (
-                          <li key={idx} className="flex justify-between items-center group">
-                            <span>{e.name}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-zinc-500">{e.sets}×{e.reps}</span>
-                              <button
-                                onClick={() => handleOpenSwap("exercise", e, day.dayName)}
-                                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-violet-300 transition"
-                                title="Swap this exercise"
-                              >
-                                <Repeat size={12} />
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs text-violet-300 font-semibold mb-3">{day.focus}</p>
+
+              {day.isRestDay ? (
+                <p className="text-[11px] text-zinc-500 italic">Active rest & muscle repair</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {(day.exercises || []).map((e, idx) => {
+                    const originalSets = parseInt(e.sets, 10) || 3;
+                    let displaySets = e.sets;
+                    let displayReps = e.reps;
+
+                    // Dynamically modulate sets/reps strictly for TODAY
+                    if (isToday) {
+                      if (isForcedDeload || currentEnergy === "Exhausted") {
+                        // 50% volume cut
+                        displaySets = Math.max(1, Math.floor(originalSets / 2));
+                        displayReps = "10-12";
+                      } else if (currentEnergy === "Very Tired" || isFatigued) {
+                        // 20% volume cut (reduce by 1 working set)
+                        displaySets = Math.max(2, originalSets - 1);
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center gap-3"
+                      >
+                        <div className="w-6 h-6 rounded-lg bg-zinc-800/80 flex items-center justify-center text-xs font-bold text-violet-400 shrink-0">
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-semibold text-white truncate">
+                            {e.name}
+                          </h4>
+                          <p className="text-[11px] text-zinc-400">
+                            {displaySets} sets × {displayReps}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
+          );
+        })}
+      </div>
+    </div>
+  );
+})()}
 
           {/* ================= TAB 3: FULL 7-DAY NUTRITION ================= */}
           {activeTab === "nutrition" && (
