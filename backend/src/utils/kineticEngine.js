@@ -158,6 +158,45 @@ export class KineticEngine {
       };
     });
   }
+
+  /**
+   * Forecasts the projected completion date based on goal delta, caloric deficit/surplus,
+   * and habit adherence velocity.
+   */
+  static forecastGoalDate(profile = {}, logs = [], habitScore = 80) {
+    const currentWeight = Number(profile.currentWeight) || 65;
+    const targetWeight = Number(profile.targetWeight) || currentWeight;
+    const weightDiff = Math.abs(currentWeight - targetWeight);
+
+    // Goal already reached or no target variance
+    if (weightDiff <= 0.2) {
+      return "Goal Met";
+    }
+
+    // 1 kg of fat mass ≈ 7700 kcal
+    const targetCalories = Number(profile.targetCalories) || 2860;
+    const maintenanceCalories = Number(profile.maintenanceCalories) || 2560;
+    const dailyDelta = Math.abs(targetCalories - maintenanceCalories);
+
+    // Minimum baseline progress rate if calories are at maintenance (0.25 kg/week)
+    const baseDaysNeeded = dailyDelta > 100
+      ? (weightDiff * 7700) / dailyDelta
+      : (weightDiff / 0.25) * 7;
+
+    // Adherence factor: Lower adherence velocity extends the projected timeline
+    const velocityFactor = habitScore > 0 ? 100 / Math.max(30, habitScore) : 1.5;
+    const projectedDays = Math.round(baseDaysNeeded * velocityFactor);
+
+    // Compute future calendar date
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + projectedDays);
+
+    return targetDate.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
 }
 
 

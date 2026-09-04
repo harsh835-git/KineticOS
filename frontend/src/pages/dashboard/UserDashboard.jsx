@@ -1016,12 +1016,15 @@ const Dashboard = () => {
   </div>
 
   <div className="flex items-center gap-3 shrink-0">
-    <div className="px-3.5 py-1.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-right">
-      <span className="text-[10px] text-zinc-500 uppercase font-mono block">Projected Completion</span>
-      <span className="text-xs font-bold text-emerald-400 font-mono flex items-center gap-1 justify-end">
-        <CalendarCheck size={12} /> {profile.goalForecastDate || "Dynamic Calibration Active"}
-      </span>
-    </div>
+   <div className="px-3.5 py-1.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-right">
+  <span className="text-[10px] text-zinc-500 uppercase font-mono block">
+    Projected Completion
+  </span>
+  <span className="text-xs font-bold text-emerald-400 font-mono flex items-center gap-1 justify-end">
+    <CalendarCheck size={12} />{" "}
+    {activeAnalytics?.goalForecastDate || profile?.goalForecastDate || "Calculating..."}
+  </span>
+</div>
   </div>
 </div>
 

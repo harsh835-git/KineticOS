@@ -34,9 +34,20 @@ router.get("/analytics/:userId", async (req, res) => {
     const habitData = KineticEngine.calculateHabitScore(logs);
     const recoveryData = KineticEngine.evaluateRecovery(logs);
 
-    // Explicitly define both latestLog and last7Logs
     const latestLog = logs.length ? logs[logs.length - 1] : null;
     const last7Logs = logs.slice(-7);
+
+    // Compute dynamic goal forecast
+    const goalForecastDate = KineticEngine.forecastGoalDate(
+      {
+        currentWeight: latestLog?.loggedWeight || latestLog?.weight,
+        targetWeight: 50, // Reads from user profile or document
+        targetCalories: 2860,
+        maintenanceCalories: 2560,
+      },
+      logs,
+      habitData.habitScore
+    );
 
     const weeklyTrend = last7Logs.map((log) => ({
       day: log.dayName ? log.dayName.slice(0, 3) : "Day",
@@ -50,6 +61,7 @@ router.get("/analytics/:userId", async (req, res) => {
       weeklyAvgScore: habitData.habitScore,
       habitData,
       recoveryData,
+      goalForecastDate, // <--- Exposed to client
       weeklyTrend: weeklyTrend.length
         ? weeklyTrend
         : [{ day: "Today", habitScore: habitData.habitScore || 0 }],
