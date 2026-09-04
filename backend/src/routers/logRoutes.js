@@ -54,14 +54,17 @@ router.get("/analytics/:userId", async (req, res) => {
       habitScore: KineticEngine.getDailyScore(log),
     }));
 
+    const riskAssessment = KineticEngine.assessDropOffRisk(logs, habitData.habitScore);
+
     return res.status(200).json({
       success: true,
       logs,
       streak: logs.length,
       weeklyAvgScore: habitData.habitScore,
       habitData,
+      riskAssessment,
       recoveryData,
-      goalForecastDate, // <--- Exposed to client
+      goalForecastDate, 
       weeklyTrend: weeklyTrend.length
         ? weeklyTrend
         : [{ day: "Today", habitScore: habitData.habitScore || 0 }],

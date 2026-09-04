@@ -197,6 +197,61 @@ export class KineticEngine {
       year: "numeric",
     });
   }
+
+  /**
+   * Computes a dynamic daily hydration goal based on activity and fatigue.
+   */
+  static calculateHydrationTarget(workoutStatus = "Pending", energyLevel = "Normal") {
+    let target = 3000;
+
+    if (workoutStatus === "Completed") {
+      target += 500;
+    }
+
+    const highFatigueFlags = ["Fatigued", "Exhausted", "Very Tired", "Slightly Fatigued"];
+    if (highFatigueFlags.includes(energyLevel)) {
+      target += 250;
+    }
+
+    return target;
+  }
+
+  /**
+   * Analyzes trailing logs to detect habit drop-off risk.
+   * Triggers an intervention if adherence slips or multiple days are skipped.
+   */
+  static assessDropOffRisk(logs = [], habitScore = 0) {
+    if (!logs || logs.length === 0) {
+      return { isAtRisk: false, reason: null, interventionType: null };
+    }
+
+    const last3Logs = logs.slice(-3);
+    const consecutiveMissedWorkouts = last3Logs.filter(
+      (l) => l.workoutStatus === "Skipped" || (l.completedExercises && l.completedExercises.length === 0)
+    ).length;
+
+    // Trigger condition 1: Low adherence velocity
+    if (habitScore > 0 && habitScore < 45) {
+      return {
+        isAtRisk: true,
+        reason: "Adherence velocity dropped below 45%",
+        interventionType: "VOLUME_RESET",
+        actionText: "Activate Emergency 15-Minute Micro-Workout",
+      };
+    }
+
+    // Trigger condition 2: 2+ missed workouts in a row
+    if (consecutiveMissedWorkouts >= 2) {
+      return {
+        isAtRisk: true,
+        reason: "Multiple consecutive training sessions missed",
+        interventionType: "STREAK_SHIELD",
+        actionText: "Claim Streak Freeze & Scale Down Plan",
+      };
+    }
+
+    return { isAtRisk: false, reason: null, interventionType: null };
+  }
 }
 
 

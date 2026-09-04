@@ -2,6 +2,7 @@ import User from "../models/user.js";
 import DailyLog from "../models/dailyLog.js";
 import WorkoutPlan from "../models/workoutPlan.js";
 import DietPlan from "../models/dietPlan.js";
+import { KineticEngine } from "../utils/kineticEngine.js";
 
 // Helper: Get local YYYY-MM-DD
 const getTodayDateString = () => {
@@ -31,14 +32,12 @@ const calculateHabitScore = (completedExCount, totalExCount, consumedMealCount, 
 const calculateStreak = (logs) => {
   if (!logs || logs.length === 0) return 0;
 
-  // Filter logs that met the threshold (e.g., at least 30% habit score or at least 1 exercise/meal completed)
   const qualifyingLogs = logs
     .filter((l) => (l.habitScore && l.habitScore >= 30) || (l.completedExercises && l.completedExercises.length > 0))
     .map((l) => l.dateString);
 
   if (qualifyingLogs.length === 0) return 0;
 
-  // Unique sorted dates in descending order (newest first)
   const uniqueDates = [...new Set(qualifyingLogs)].sort((a, b) => new Date(b) - new Date(a));
 
   const todayStr = getTodayDateString();
@@ -46,7 +45,6 @@ const calculateStreak = (logs) => {
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
 
-  // If neither today nor yesterday was completed, streak is 0
   if (uniqueDates[0] !== todayStr && uniqueDates[0] !== yesterdayStr) {
     return 0;
   }
@@ -79,6 +77,7 @@ export const getTodayLog = async (req, res) => {
     let log = await DailyLog.findOne({ userId, dateString });
 
     if (!log) {
+      const calculatedTarget = KineticEngine.calculateHydrationTarget("Pending", "Normal");
       log = await DailyLog.create({
         userId,
         dateString,
@@ -86,8 +85,19 @@ export const getTodayLog = async (req, res) => {
         completedExercises: [],
         consumedMeals: [],
         waterMl: 0,
+        waterTargetMl: calculatedTarget,
         habitScore: 0,
       });
+    } else {
+      // Re-evaluate target based on current energy and workout progression
+      const calculatedTarget = KineticEngine.calculateHydrationTarget(
+        log.workoutStatus || (log.completedExercises?.length > 0 ? "Completed" : "Pending"),
+        log.energyLevel || "Normal"
+      );
+      if (log.waterTargetMl !== calculatedTarget) {
+        log.waterTargetMl = calculatedTarget;
+        await log.save();
+      }
     }
 
     return res.status(200).json({ success: true, log });
@@ -116,12 +126,21 @@ export const toggleExercise = async (req, res) => {
       log.completedExercises.push(exerciseName);
     }
 
+    // Sync workout completion state
+    const targetExCount = totalExercises || 4;
+    const isCompleted = log.completedExercises.length >= targetExCount;
+    log.workoutStatus = isCompleted ? "Completed" : log.completedExercises.length > 0 ? "Partial" : "Pending";
+
+    // Dynamic hydration adjustment
+    const calculatedTarget = KineticEngine.calculateHydrationTarget(log.workoutStatus, log.energyLevel || "Normal");
+    log.waterTargetMl = calculatedTarget;
+
     // Recalculate score
     log.habitScore = calculateHabitScore(
       log.completedExercises.length,
-      totalExercises || 4,
+      targetExCount,
       log.consumedMeals.length,
-      4, // 4 standard meals
+      4,
       log.waterMl,
       log.waterTargetMl
     );
@@ -152,6 +171,10 @@ export const toggleMeal = async (req, res) => {
     } else {
       log.consumedMeals.push(mealName);
     }
+
+    // Ensure water target matches current parameters
+    const calculatedTarget = KineticEngine.calculateHydrationTarget(log.workoutStatus || "Pending", log.energyLevel || "Normal");
+    log.waterTargetMl = calculatedTarget;
 
     log.habitScore = calculateHabitScore(
       log.completedExercises.length,
@@ -184,6 +207,10 @@ export const logWater = async (req, res) => {
 
     log.waterMl = Math.max(0, (log.waterMl || 0) + (Number(amountMl) || 250));
 
+    // Dynamic hydration recalculation
+    const calculatedTarget = KineticEngine.calculateHydrationTarget(log.workoutStatus || "Pending", log.energyLevel || "Normal");
+    log.waterTargetMl = calculatedTarget;
+
     log.habitScore = calculateHabitScore(
       log.completedExercises.length,
       totalExercises || 4,
@@ -206,7 +233,6 @@ export const getWeeklyAnalytics = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Fetch logs from the last 7 days
     const past7Days = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
@@ -229,7 +255,6 @@ export const getWeeklyAnalytics = async (req, res) => {
     const allUserLogs = await DailyLog.find({ userId });
     const streak = calculateStreak(allUserLogs);
 
-    // Map the 7-day timeline
     const weeklyTrend = past7Days.map((p) => {
       const entry = logs.find((l) => l.dateString === p.dateString);
       return {
@@ -243,7 +268,6 @@ export const getWeeklyAnalytics = async (req, res) => {
       };
     });
 
-    // Calculate weekly completion average
     const totalScore = weeklyTrend.reduce((acc, curr) => acc + curr.habitScore, 0);
     const avgScore = Math.round(totalScore / 7);
 
@@ -278,7 +302,6 @@ export const logWeight = async (req, res) => {
     log.loggedWeight = Number(weight);
     await log.save();
 
-    // Also update user's profile currentWeight and BMI
     const user = await User.findById(userId);
     if (user && user.profile) {
       user.profile.currentWeight = Number(weight);

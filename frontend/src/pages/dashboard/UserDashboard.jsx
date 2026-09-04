@@ -88,6 +88,12 @@ const Dashboard = () => {
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [analyticsData, setAnalyticsData] = useState(null);
 
+  const [isMicroWorkoutActive, setIsMicroWorkoutActive] = useState(false);
+
+const handleActivateMicro = () => {
+  setIsMicroWorkoutActive(true);
+};
+
  const fetchDashboardAndLogs = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
@@ -508,6 +514,29 @@ const Dashboard = () => {
       tag: "Deload Active",
     };
   });
+
+  const handleHydrationUpdate = async (delta) => {
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const userId = storedUser.id || storedUser._id;
+    if (!userId) return;
+
+    try {
+      const res = await fetch("http://localhost:5000/api/log/water", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, amountMl: delta }),
+      });
+      const resData = await res.json();
+      if (resData.success) {
+        setDailyLog(resData.log);
+        if (typeof fetchAnalytics === "function") {
+          fetchAnalytics();
+        }
+      }
+    } catch (err) {
+      console.error("Hydration update error:", err);
+    }
+  };
   return (
     <div className="max-h-screen bg-[#050507] text-white flex relative overflow-x-hidden">
       {/* Background Ambience */}
@@ -913,6 +942,7 @@ const Dashboard = () => {
         
 
         <main className="flex-1 p-6 lg:p-8 max-w-6xl w-full mx-auto">
+          
           {/* ================= 5 BALANCED METRICS STRIP ================= */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-8">
             {/* 1. Active Goal */}
@@ -947,30 +977,37 @@ const Dashboard = () => {
               <span className="text-[10px] text-zinc-500">{profile.currentWeight || 67} kg → Goal: {profile.targetWeight || 50} kg</span>
             </div>
 
-            {/* 4. Hydration Tracker */}
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
-              <div className="flex items-center justify-between text-zinc-400">
-                <span className="text-[10px] uppercase tracking-wider font-semibold">Hydration</span>
-                <Droplets size={15} className="text-blue-400" />
-              </div>
-              <p className="text-base font-bold mt-2 text-blue-300">
-                {dailyLog?.waterMl || 0} <span className="text-[11px] text-zinc-400">/ 3000 ml</span>
-              </p>
-              <div className="flex gap-1.5 mt-2">
-                <button
-                  onClick={() => handleAdjustWater(250)}
-                  className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold hover:bg-blue-500/30 flex items-center gap-0.5 cursor-pointer"
-                >
-                  <Plus size={9} /> 250
-                </button>
-                <button
-                  onClick={() => handleAdjustWater(-250)}
-                  className="px-2 py-0.5 rounded bg-white/[0.05] text-zinc-400 text-[10px] font-bold hover:bg-white/[0.1] flex items-center gap-0.5 cursor-pointer"
-                >
-                  <Minus size={9} /> 250
-                </button>
-              </div>
-            </div>
+           {/* Hydration */}
+                <div className="p-4 rounded-2xl bg-[#0f0f15] border border-white/[0.06]">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
+                      Hydration
+                    </span>
+                    <Droplets size={14} className="text-blue-400" />
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-sm font-bold text-blue-400">
+                      {dailyLog?.waterMl || 0}
+                    </span>
+                    <span className="text-xs text-zinc-500">
+                      / {dailyLog?.waterTargetMl || activeAnalytics?.dynamicWaterTarget || 3000} ml
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <button
+                      onClick={() => handleHydrationUpdate(250)}
+                      className="px-2 py-0.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 font-mono text-[10px] border border-blue-500/20 transition"
+                    >
+                      +250
+                    </button>
+                    <button
+                      onClick={() => handleHydrationUpdate(-250)}
+                      className="px-2 py-0.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] text-zinc-400 font-mono text-[10px] border border-white/[0.06] transition"
+                    >
+                      -250
+                    </button>
+                  </div>
+                </div>
 
            {/* 5. Habit Engine & Streak (Combined) */}
             <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
@@ -989,6 +1026,63 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+{/* ================= 1. DEDICATED HABIT ENGINE SCORE ALERT (< 45%) ================= */}
+{(() => {
+  const currentScore = Number(
+    dailyLog?.habitScore !== undefined
+      ? dailyLog.habitScore
+      : activeAnalytics?.habitData?.habitScore ?? 0
+  );
+
+  if (currentScore >= 45) return null;
+
+  return (
+    <div className="mb-4 p-4 rounded-3xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 animate-pulse">
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400 shrink-0">
+          <ShieldAlert size={18} />
+        </div>
+        <div>
+          <h4 className="text-xs font-bold text-rose-300 uppercase tracking-wide">
+            Habit Engine Warning • Score at {currentScore}%
+          </h4>
+          <p className="text-[11px] text-zinc-300 mt-0.5">
+            Stay hydrated, complete your scheduled workout, and hit your nutrition goals today to restore your balance.
+          </p>
+        </div>
+      </div>
+      <span className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0">
+        Needs Action
+      </span>
+    </div>
+  );
+})()}
+
+{/* ================= 2. DROP-OFF RISK / MICRO-WORKOUT INTERVENTION ================= */}
+{activeAnalytics?.riskAssessment?.isAtRisk && (
+  <div className="mb-6 p-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="flex items-center gap-3">
+      <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 shrink-0">
+        <ShieldAlert size={18} />
+      </div>
+      <div>
+        <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wide">
+          Streak At Risk • {activeAnalytics?.riskAssessment?.reason || "Momentum slipping"}
+        </h4>
+        <p className="text-[11px] text-zinc-400">
+          Momentum is slipping. Lower the bar today to protect your habit loop.
+        </p>
+      </div>
+    </div>
+
+   <button
+      onClick={() => handleHydrationUpdate(250)}
+      className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-black font-semibold text-xs shrink-0 hover:bg-amber-400 transition"
+    >
+      {activeAnalytics.riskAssessment.actionText}
+    </button>
+  </div>
+)}
 
           {/* ================= RECOVERY & ADAPTIVE ALERT BANNER ================= */}
 <div className="mb-6 p-4 rounded-3xl bg-gradient-to-r from-violet-950/40 via-[#111118] to-[#111118] border border-violet-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
