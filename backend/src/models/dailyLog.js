@@ -86,6 +86,17 @@ const dailyLogSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+
+
+    // Add inside dailyLogSchema (or as a separate Measurement schema):
+measurements: {
+  waist: { type: Number, default: null }, // in cm or inches
+  chest: { type: Number, default: null },
+  hips: { type: Number, default: null },
+  arms: { type: Number, default: null },
+  thighs: { type: Number, default: null },
+  loggedAt: { type: Date, default: Date.now }
+}
   },
   { timestamps: true }
 );

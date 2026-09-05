@@ -35,6 +35,9 @@ import {
   ShieldAlert,
   HeartPulse,
   CalendarCheck,
+  Sun,
+  Moon,
+  Ruler,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -48,7 +51,7 @@ import {
 import ActiveWorkoutModal from "../../components/ActiveWorkoutModal";
 import GroceryModal from "../../components/publicModals/groceryModal";
 import DailyCheckInModal from "../../components/DailyCheckInModal";
-
+import BodyMeasurementModal from "../../components/BodyMeasurementModal";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -59,14 +62,15 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("overview"); // "overview" | "workout" | "nutrition" | "analytics"
+  const [activeTab, setActiveTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMeasurementOpen, setIsMeasurementOpen] = useState(false);
 
   // Smart Swap Modal State
   const [swapModalOpen, setSwapModalOpen] = useState(false);
   const [swapLoading, setSwapLoading] = useState(false);
   const [swapData, setSwapData] = useState({
-    type: "", // "exercise" | "meal"
+    type: "",
     currentItem: null,
     dayName: "",
     suggestions: [],
@@ -84,17 +88,34 @@ const Dashboard = () => {
 
   const [isActiveWorkoutOpen, setIsActiveWorkoutOpen] = useState(false);
   const [isGroceryOpen, setIsGroceryOpen] = useState(false);
-
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
   const [analyticsData, setAnalyticsData] = useState(null);
-
   const [isMicroWorkoutActive, setIsMicroWorkoutActive] = useState(false);
 
-const handleActivateMicro = () => {
-  setIsMicroWorkoutActive(true);
-};
+  const handleActivateMicro = () => {
+    setIsMicroWorkoutActive(true);
+  };
 
- const fetchDashboardAndLogs = async () => {
+  // Theme state synced with html.dark class and localStorage
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem("theme") || "dark";
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
+
+  const fetchDashboardAndLogs = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
 
@@ -145,7 +166,6 @@ const handleActivateMicro = () => {
     }
   };
 
-  // Run exactly once on mount
   useEffect(() => {
     fetchDashboardAndLogs();
   }, []);
@@ -156,7 +176,6 @@ const handleActivateMicro = () => {
     navigate("/login");
   };
 
-  // Open Swap Modal & Trigger AI Synthesis
   const handleOpenSwap = async (type, currentItem, dayName) => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
@@ -182,7 +201,6 @@ const handleActivateMicro = () => {
     }
   };
 
-  // Apply Selected AI Alternative to MongoDB
   const handleApplySwap = async (selectedItem) => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
@@ -217,43 +235,42 @@ const handleActivateMicro = () => {
   };
 
   const handleSendMessage = async (customText = null) => {
-  const textToSend = customText || chatInput;
-  if (!textToSend.trim() || chatLoading) return;
+    const textToSend = customText || chatInput;
+    if (!textToSend.trim() || chatLoading) return;
 
-  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const userId = storedUser.id || storedUser._id;
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const userId = storedUser.id || storedUser._id;
 
-  const newMessages = [...chatMessages, { sender: "user", text: textToSend }];
-  setChatMessages(newMessages);
-  if (!customText) setChatInput("");
-  setChatLoading(true);
+    const newMessages = [...chatMessages, { sender: "user", text: textToSend }];
+    setChatMessages(newMessages);
+    if (!customText) setChatInput("");
+    setChatLoading(true);
 
-  try {
-    const res = await fetch("http://localhost:5000/api/coach/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId,
-        message: textToSend,
-        history: newMessages,
-      }),
-    });
-    const result = await res.json();
-    if (result.success) {
-      setChatMessages((prev) => [...prev, { sender: "coach", text: result.reply }]);
+    try {
+      const res = await fetch("http://localhost:5000/api/coach/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          message: textToSend,
+          history: newMessages,
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        setChatMessages((prev) => [...prev, { sender: "coach", text: result.reply }]);
+      }
+    } catch (err) {
+      console.error("Chat Error:", err);
+      setChatMessages((prev) => [
+        ...prev,
+        { sender: "coach", text: "Connection error. Make sure backend is active." },
+      ]);
+    } finally {
+      setChatLoading(false);
     }
-  } catch (err) {
-    console.error("Chat Error:", err);
-    setChatMessages((prev) => [
-      ...prev,
-      { sender: "coach", text: "Connection error. Make sure backend is active." },
-    ]);
-  } finally {
-    setChatLoading(false);
-  }
-};
+  };
 
-  // Toggle Exercise Check-off
   const handleToggleExercise = async (exerciseName) => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
@@ -281,7 +298,6 @@ const handleActivateMicro = () => {
     }
   };
 
-  // Toggle Meal Consumed
   const handleToggleMeal = async (mealName) => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
@@ -309,7 +325,6 @@ const handleActivateMicro = () => {
     }
   };
 
-  // Adjust Water Intake
   const handleAdjustWater = async (amountMl) => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
@@ -328,7 +343,6 @@ const handleActivateMicro = () => {
     }
   };
 
-  // Log Daily Weight
   const handleLogWeight = async (e) => {
     e.preventDefault();
     if (!newWeightInput || Number(newWeightInput) <= 0) return;
@@ -352,7 +366,6 @@ const handleActivateMicro = () => {
     }
   };
 
-  // Toggle Veg / Non-Veg
   const handleToggleDiet = async () => {
     if (!data?.user?.profile) return;
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -389,7 +402,6 @@ const handleActivateMicro = () => {
     }
   };
 
-  // Change Target Goal
   const handleChangeGoal = async (newGoal) => {
     if (!data?.user?.profile || newGoal === data.user.profile.primaryGoal) return;
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -433,8 +445,8 @@ const handleActivateMicro = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#050507] text-white flex items-center justify-center">
-        <div className="flex items-center gap-3 text-violet-400">
+      <div className="min-h-screen bg-slate-50 dark:bg-[#050507] text-slate-900 dark:text-white flex items-center justify-center">
+        <div className="flex items-center gap-3 text-violet-600 dark:text-violet-400">
           <Activity className="animate-spin" size={24} />
           <span className="text-sm font-semibold tracking-wider uppercase">Loading KineticOS Engine...</span>
         </div>
@@ -444,11 +456,11 @@ const handleActivateMicro = () => {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-[#050507] text-white flex flex-col items-center justify-center p-4">
-        <p className="text-red-400 text-sm mb-4">{error || "No dashboard data available."}</p>
+      <div className="min-h-screen bg-slate-50 dark:bg-[#050507] text-slate-900 dark:text-white flex flex-col items-center justify-center p-4">
+        <p className="text-red-500 dark:text-red-400 text-sm mb-4">{error || "No dashboard data available."}</p>
         <button
           onClick={() => navigate("/onboarding")}
-          className="px-5 py-2.5 bg-violet-600 rounded-xl text-xs font-semibold cursor-pointer"
+          className="px-5 py-2.5 bg-violet-600 rounded-xl text-xs font-semibold text-white cursor-pointer"
         >
           Setup Profile & Generate Plans
         </button>
@@ -475,7 +487,6 @@ const handleActivateMicro = () => {
     "Improve Endurance",
   ];
 
-  // Safe computation variables
   const activeAnalytics = analyticsData || analytics;
 
   const recoveryInfo = activeAnalytics?.recoveryData || {
@@ -484,36 +495,9 @@ const handleActivateMicro = () => {
     guidance: "Optimal metabolic readiness cleared.",
   };
 
-  const calculatedHabitScore =
-    activeAnalytics?.habitData?.habitScore ??
-    activeAnalytics?.weeklyAvgScore ??
-    dailyLog?.habitScore ??
-    0;
-
-    
   const isDeloadActive =
     activeAnalytics?.recoveryData?.forceRecoveryDay ||
     activeAnalytics?.recoveryData?.latestEnergy === "Exhausted";
-
-    const workoutSchedule =
-  data?.workoutPlan?.schedule ||
-  data?.weeklyWorkoutPlan?.schedule ||
-  data?.workoutRoutine?.schedule ||
-  data?.plan?.workoutPlan?.schedule ||
-  data?.schedule ||
-  [];
-
-  const currentExercises = (data?.workoutPlan || []).map((ex) => {
-    if (!isDeloadActive) return ex;
-    const originalSets = parseInt(ex.sets, 10) || 3;
-    return {
-      ...ex,
-      isModulated: true,
-      sets: Math.max(1, Math.floor(originalSets / 2)),
-      reps: "10-12 (Active Deload)",
-      tag: "Deload Active",
-    };
-  });
 
   const handleHydrationUpdate = async (delta) => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -537,54 +521,55 @@ const handleActivateMicro = () => {
       console.error("Hydration update error:", err);
     }
   };
+
   return (
-    <div className="max-h-screen bg-[#050507] text-white flex relative overflow-x-hidden">
+    <div className="max-h-screen bg-slate-50 text-slate-900 dark:bg-[#050507] dark:text-white flex relative overflow-x-hidden transition-colors duration-300">
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-48 -left-48 w-[550px] h-[550px] rounded-full bg-violet-700/10 blur-[160px]" />
-        <div className="absolute top-[40%] -right-48 w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[160px]" />
+        <div className="absolute -top-48 -left-48 w-[550px] h-[550px] rounded-full bg-violet-600/10 dark:bg-violet-700/10 blur-[160px]" />
+        <div className="absolute top-[40%] -right-48 w-[500px] h-[500px] rounded-full bg-purple-500/10 dark:bg-purple-600/10 blur-[160px]" />
       </div>
 
       {updating && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
           <RefreshCw className="animate-spin text-violet-400" size={32} />
-          <p className="text-xs font-semibold text-zinc-300 tracking-wider uppercase">Updating KineticOS Matrix...</p>
+          <p className="text-xs font-semibold text-white tracking-wider uppercase">Updating KineticOS Matrix...</p>
         </div>
       )}
-       {/* ================= COMPACT & EXPANDABLE SIDEBAR ================= */}
+
+      {/* ================= COMPACT & EXPANDABLE SIDEBAR ================= */}
       <aside
-        className={`h-screen sticky top-0 bg-[#09090c]/95 border-r border-white/[0.06] backdrop-blur-2xl flex flex-col justify-between py-5 z-40 shrink-0 transition-all duration-300 ease-in-out ${
+        className={`h-screen sticky top-0 bg-white/95 border-r border-slate-200 dark:bg-[#09090c]/95 dark:border-white/[0.06] backdrop-blur-2xl flex flex-col justify-between py-5 z-40 shrink-0 transition-all duration-300 ease-in-out ${
           sidebarOpen ? "w-64 px-4" : "w-16 px-2 items-center"
         }`}
       >
         <div className="flex flex-col gap-4 w-full">
-          {/* Top Menu / Hamburger Toggle */}
           <div className="flex items-center justify-center w-full">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className={`flex items-center cursor-pointer rounded-xl text-zinc-400 hover:text-white hover:bg-white/[0.06] transition ${
-                sidebarOpen ? "w-full justify-between px-3 py-2 bg-white/[0.03]" : "w-10 h-10 justify-center"
+              className={`flex items-center cursor-pointer rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/[0.06] transition ${
+                sidebarOpen ? "w-full justify-between px-3 py-2 bg-slate-100 dark:bg-white/[0.03]" : "w-10 h-10 justify-center"
               }`}
               title={sidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
             >
               <div className="flex items-center gap-2.5">
-                <Menu size={18} className="text-zinc-300" />
+                <Menu size={18} className="text-slate-700 dark:text-zinc-300" />
                 {sidebarOpen && (
-                  <span className="text-xs font-semibold tracking-wider uppercase text-zinc-400">
+                  <span className="text-xs font-semibold tracking-wider uppercase text-slate-500 dark:text-zinc-400">
                     Menu
                   </span>
                 )}
               </div>
-              {sidebarOpen && <X size={15} className="text-zinc-500 hover:text-white" />}
+              {sidebarOpen && <X size={15} className="text-slate-500 dark:text-zinc-500 hover:text-slate-900 dark:hover:text-white" />}
             </button>
           </div>
 
           {/* Quick Diet Toggle */}
           {sidebarOpen ? (
-            <div className="p-2.5 rounded-xl bg-white/[0.025] border border-white/[0.06]">
+            <div className="p-2.5 rounded-xl bg-slate-100/80 border border-slate-200 dark:bg-white/[0.025] dark:border-white/[0.06]">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Diet</span>
-                <span className={`text-[10px] font-semibold capitalize ${isVeg ? "text-emerald-400" : "text-amber-400"}`}>
+                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-zinc-400 tracking-wider">Diet</span>
+                <span className={`text-[10px] font-semibold capitalize ${isVeg ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
                   {profile.dietaryPreference || "Non-Veg"}
                 </span>
               </div>
@@ -592,15 +577,15 @@ const handleActivateMicro = () => {
                 type="button"
                 onClick={handleToggleDiet}
                 disabled={updating}
-                className="w-full flex items-center justify-between p-1 rounded-lg bg-black/40 border border-white/[0.08] cursor-pointer hover:border-violet-500/40 transition"
+                className="w-full flex items-center justify-between p-1 rounded-lg bg-white dark:bg-black/40 border border-slate-200 dark:border-white/[0.08] cursor-pointer hover:border-violet-500 transition shadow-sm dark:shadow-none"
               >
                 <span className={`flex-1 py-1 rounded text-center text-[10px] font-semibold transition ${
-                  isVeg ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "text-zinc-500"
+                  isVeg ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30" : "text-slate-500 dark:text-zinc-500"
                 }`}>
                   🌱 Veg
                 </span>
                 <span className={`flex-1 py-1 rounded text-center text-[10px] font-semibold transition ${
-                  !isVeg ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "text-zinc-500"
+                  !isVeg ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30" : "text-slate-500 dark:text-zinc-500"
                 }`}>
                   🍗 Non-Veg
                 </span>
@@ -613,8 +598,8 @@ const handleActivateMicro = () => {
                 disabled={updating}
                 className={`w-10 h-10 rounded-xl flex items-center justify-center transition cursor-pointer border ${
                   isVeg
-                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25"
-                    : "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
+                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+                    : "bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25"
                 }`}
                 title={`Diet: ${isVeg ? "Vegetarian (Click to switch)" : "Non-Vegetarian (Click to switch)"}`}
               >
@@ -623,7 +608,7 @@ const handleActivateMicro = () => {
             </div>
           )}
 
-          <div className="w-full h-px bg-white/[0.08] my-0.5" />
+          <div className="w-full h-px bg-slate-200 dark:bg-white/[0.08] my-0.5" />
 
           {/* Navigation Items */}
           <div className="flex flex-col gap-1.5 w-full items-center">
@@ -637,14 +622,14 @@ const handleActivateMicro = () => {
                   className={`flex items-center gap-3 rounded-xl transition cursor-pointer relative group ${
                     isActive
                       ? "bg-violet-600 text-white shadow-lg shadow-violet-900/40"
-                      : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/[0.04]"
                   } ${sidebarOpen ? "w-full px-3 py-2.5 justify-start" : "w-10 h-10 justify-center"}`}
                   title={!sidebarOpen ? item.label : undefined}
                 >
                   <Icon size={18} className="shrink-0" />
                   {sidebarOpen && <span className="text-xs font-semibold whitespace-nowrap">{item.label}</span>}
                   {!sidebarOpen && (
-                    <span className="absolute left-14 px-2.5 py-1 rounded-md bg-[#18181f] border border-white/[0.1] text-white text-[11px] font-semibold whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition shadow-xl z-50">
+                    <span className="absolute left-14 px-2.5 py-1 rounded-md bg-slate-900 dark:bg-[#18181f] border border-slate-700 dark:border-white/[0.1] text-white text-[11px] font-semibold whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition shadow-xl z-50">
                       {item.label}
                     </span>
                   )}
@@ -655,15 +640,15 @@ const handleActivateMicro = () => {
 
           {/* Goal Selector */}
           {sidebarOpen && (
-            <div className="p-3 rounded-xl bg-white/[0.025] border border-white/[0.06] mt-1">
-              <label className="block text-[10px] uppercase font-bold text-zinc-400 tracking-wider mb-1.5">
+            <div className="p-3 rounded-xl bg-slate-100/80 border border-slate-200 dark:bg-white/[0.025] dark:border-white/[0.06] mt-1">
+              <label className="block text-[10px] uppercase font-bold text-slate-500 dark:text-zinc-400 tracking-wider mb-1.5">
                 Target Goal
               </label>
               <select
                 value={profile.primaryGoal || "Weight Loss"}
                 onChange={(e) => handleChangeGoal(e.target.value)}
                 disabled={updating}
-                className="w-full h-8 bg-[#111117] border border-white/[0.08] rounded-lg px-2 text-xs text-white focus:border-violet-500 outline-none cursor-pointer"
+                className="w-full h-8 bg-white border border-slate-200 dark:bg-[#111117] dark:border-white/[0.08] rounded-lg px-2 text-xs text-slate-900 dark:text-white focus:border-violet-500 outline-none cursor-pointer"
               >
                 {availableGoals.map((g) => (
                   <option key={g} value={g}>
@@ -676,7 +661,7 @@ const handleActivateMicro = () => {
         </div>
 
         {/* User & Logout Section */}
-        <div className="flex flex-col gap-2.5 w-full pt-3 border-t border-white/[0.06] items-center">
+        <div className="flex flex-col gap-2.5 w-full pt-3 border-t border-slate-200 dark:border-white/[0.06] items-center">
           <div className={`flex items-center gap-2.5 ${sidebarOpen ? "w-full px-1" : "justify-center"}`}>
             <div
               className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-600 to-violet-800 flex items-center justify-center text-white text-xs font-bold border border-violet-400/30 shrink-0"
@@ -686,15 +671,15 @@ const handleActivateMicro = () => {
             </div>
             {sidebarOpen && (
               <div className="overflow-hidden">
-                <p className="text-xs font-semibold text-white truncate max-w-[140px]">{user.name}</p>
-                <p className="text-[10px] text-zinc-500 truncate max-w-[140px]">{user.email}</p>
+                <p className="text-xs font-semibold text-slate-900 dark:text-white truncate max-w-[140px]">{user.name}</p>
+                <p className="text-[10px] text-slate-500 dark:text-zinc-500 truncate max-w-[140px]">{user.email}</p>
               </div>
             )}
           </div>
 
           <button
             onClick={handleLogout}
-            className={`flex items-center gap-2 rounded-xl text-zinc-400 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer relative group ${
+            className={`flex items-center gap-2 rounded-xl text-slate-500 hover:text-red-500 hover:bg-red-500/10 dark:text-zinc-400 dark:hover:text-red-400 dark:hover:bg-red-500/10 transition cursor-pointer relative group ${
               sidebarOpen ? "w-full px-3 py-2 text-xs font-semibold justify-start" : "w-10 h-10 justify-center"
             }`}
             title={!sidebarOpen ? "Sign Out" : undefined}
@@ -702,7 +687,7 @@ const handleActivateMicro = () => {
             <LogOut size={16} className="shrink-0" />
             {sidebarOpen && <span>Sign Out</span>}
             {!sidebarOpen && (
-              <span className="absolute left-14 px-2.5 py-1 rounded-md bg-[#18181f] border border-white/[0.1] text-red-400 text-[11px] font-semibold whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition shadow-xl z-50">
+              <span className="absolute left-14 px-2.5 py-1 rounded-md bg-slate-900 dark:bg-[#18181f] border border-slate-700 dark:border-white/[0.1] text-red-400 text-[11px] font-semibold whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition shadow-xl z-50">
                 Sign Out
               </span>
             )}
@@ -710,45 +695,43 @@ const handleActivateMicro = () => {
         </div>
       </aside>
 
-      {/* ================= SMART SWAP MODAL (GEMINI GEN AI) ================= */}
+      {/* ================= SMART SWAP MODAL ================= */}
       {swapModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#0e0e14] border border-white/[0.1] rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-            <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white border border-slate-200 dark:bg-[#0e0e14] dark:border-white/[0.1] rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/[0.06] mb-5">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
+                <div className="w-9 h-9 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-600 dark:text-violet-400">
                   <Repeat size={18} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Smart {swapData.type === "exercise" ? "Exercise" : "Meal"} Swap</h3>
-                  <p className="text-[10px] text-zinc-400 mt-0.5">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Smart {swapData.type === "exercise" ? "Exercise" : "Meal"} Swap</h3>
+                  <p className="text-[10px] text-slate-500 dark:text-zinc-400 mt-0.5">
                     Synthesizing identical metabolic & biomechanical outputs
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setSwapModalOpen(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.05]"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/[0.05]"
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* Current Item Preview */}
-            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-5">
-              <span className="text-[10px] uppercase font-bold text-zinc-500">Currently Replacing:</span>
-              <p className="text-xs font-semibold text-zinc-200 mt-0.5">
+            <div className="p-3 rounded-xl bg-slate-100 border border-slate-200 dark:bg-white/[0.03] dark:border-white/[0.06] mb-5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-zinc-500">Currently Replacing:</span>
+              <p className="text-xs font-semibold text-slate-800 dark:text-zinc-200 mt-0.5">
                 {swapData.type === "exercise"
                   ? `${swapData.currentItem?.name} (${swapData.currentItem?.sets} × ${swapData.currentItem?.reps})`
                   : `${swapData.currentItem?.mealName} (${swapData.currentItem?.calories} kcal)`}
               </p>
             </div>
 
-            {/* AI Generated Suggestions */}
             {swapLoading ? (
               <div className="py-12 flex flex-col items-center justify-center gap-3">
-                <RefreshCw className="animate-spin text-violet-400" size={26} />
-                <p className="text-xs text-zinc-400">Synthesizing 3 precision alternatives via Gemini...</p>
+                <RefreshCw className="animate-spin text-violet-500 dark:text-violet-400" size={26} />
+                <p className="text-xs text-slate-500 dark:text-zinc-400">Synthesizing 3 precision alternatives via Gemini...</p>
               </div>
             ) : (
               <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
@@ -756,24 +739,24 @@ const handleActivateMicro = () => {
                   <div
                     key={idx}
                     onClick={() => handleApplySwap(item)}
-                    className="p-4 rounded-2xl bg-white/[0.025] border border-white/[0.06] hover:border-violet-500/50 hover:bg-violet-950/20 transition cursor-pointer flex items-center justify-between group"
+                    className="p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-violet-500 hover:bg-violet-50 dark:bg-white/[0.025] dark:border-white/[0.06] dark:hover:border-violet-500/50 dark:hover:bg-violet-950/20 transition cursor-pointer flex items-center justify-between group"
                   >
                     <div>
-                      <p className="text-xs font-bold text-white group-hover:text-violet-300 transition">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-300 transition">
                         {swapData.type === "exercise" ? item.name : item.mealName}
                       </p>
                       {swapData.type === "exercise" ? (
-                        <p className="text-[10px] text-zinc-500 mt-0.5">
+                        <p className="text-[10px] text-slate-500 dark:text-zinc-500 mt-0.5">
                           {item.equipment} • {item.formGuidance}
                         </p>
                       ) : (
-                        <p className="text-[10px] text-zinc-500 mt-0.5">
+                        <p className="text-[10px] text-slate-500 dark:text-zinc-500 mt-0.5">
                           {item.suggestedItems?.join(", ")}
                         </p>
                       )}
                     </div>
                     <div className="text-right shrink-0 ml-3">
-                      <span className="text-xs font-mono font-bold text-violet-400">
+                      <span className="text-xs font-mono font-bold text-violet-600 dark:text-violet-400">
                         {swapData.type === "exercise"
                           ? `${item.sets} × ${item.reps}`
                           : `${item.calories} kcal`}
@@ -787,131 +770,126 @@ const handleActivateMicro = () => {
         </div>
       )}
 
+      {/* Floating Action Buttons */}
       <button
-          onClick={() => setIsCheckInOpen(true)}
-          className="fixed bottom-20 right-6 z-40 px-5 py-3 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-2xl shadow-violet-900/60 border border-violet-400/30 transition hover:scale-105"
-        >
-          <Zap size={16} />
-          <span>Check-In</span>
-        </button>
+        onClick={() => setIsCheckInOpen(true)}
+        className="fixed bottom-20 right-6 z-40 px-5 py-3 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-2xl shadow-violet-900/60 border border-violet-400/30 transition hover:scale-105"
+      >
+        <Zap size={16} />
+        <span>Check-In</span>
+      </button>
 
-       {/* ================= FLOATING AI COACH TRIGGER & DRAWER ================= */}
-        {/* Floating Action Button */}
-        <button
-          onClick={() => setIsChatOpen(!isChatOpen)}
-          className="fixed bottom-6 right-6 z-40 px-4 py-3 rounded-full bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white font-bold text-xs shadow-[0_0_25px_rgba(139,92,246,0.45)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer border border-violet-400/30"
-        >
-          <Sparkles size={16} className="animate-pulse" />
-          <span>Ask Kinetic Coach</span>
-        </button>
+      <button
+        onClick={() => setIsChatOpen(!isChatOpen)}
+        className="fixed bottom-6 right-6 z-40 px-4 py-3 rounded-full bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white font-bold text-xs shadow-[0_0_25px_rgba(139,92,246,0.45)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer border border-violet-400/30"
+      >
+        <Sparkles size={16} className="animate-pulse" />
+        <span>Ask Kinetic Coach</span>
+      </button>
 
-        {/* Slide-out AI Coach Drawer */}
-        {isChatOpen && (
-          <div className="fixed bottom-20 right-6 z-50 w-full max-w-sm sm:max-w-md h-[520px] bg-[#0e0e14]/95 border border-white/[0.1] rounded-3xl shadow-2xl backdrop-blur-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
-            {/* Drawer Header */}
-            <div className="p-4 border-b border-white/[0.06] flex items-center justify-between bg-white/[0.02]">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
-                  <Activity size={16} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                    Kinetic Coach <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  </h4>
-                  <p className="text-[10px] text-zinc-400">Context-Aware AI Assistant</p>
+      {/* Slide-out AI Coach Drawer */}
+      {isChatOpen && (
+        <div className="fixed bottom-20 right-6 z-50 w-full max-w-sm sm:max-w-md h-[520px] bg-white/95 border border-slate-200 dark:bg-[#0e0e14]/95 dark:border-white/[0.1] rounded-3xl shadow-2xl backdrop-blur-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200">
+          <div className="p-4 border-b border-slate-200 dark:border-white/[0.06] flex items-center justify-between bg-slate-50 dark:bg-white/[0.02]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-600 dark:text-violet-400">
+                <Activity size={16} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  Kinetic Coach <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                </h4>
+                <p className="text-[10px] text-slate-500 dark:text-zinc-400">Context-Aware AI Assistant</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsChatOpen(false)}
+              className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/[0.05]"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto border-b border-slate-200 dark:border-white/[0.04] scrollbar-none bg-slate-100/50 dark:bg-black/20">
+            {[
+              "Quick 20-min workout tweak?",
+              "High protein snack ideas?",
+              "Fix lower back tightness",
+            ].map((chip, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleSendMessage(chip)}
+                className="text-[10px] whitespace-nowrap px-2.5 py-1 rounded-full bg-white dark:bg-white/[0.03] hover:bg-violet-100 hover:text-violet-600 dark:hover:bg-violet-500/20 dark:hover:text-violet-300 border border-slate-200 dark:border-white/[0.06] text-slate-600 dark:text-zinc-400 transition"
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 p-4 overflow-y-auto space-y-3">
+            {chatMessages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
+                    msg.sender === "user"
+                      ? "bg-violet-600 text-white rounded-br-none"
+                      : "bg-slate-100 border border-slate-200 text-slate-800 dark:bg-white/[0.04] dark:border-white/[0.07] dark:text-zinc-200 rounded-bl-none"
+                  }`}
+                >
+                  <p className="whitespace-pre-line">{msg.text}</p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsChatOpen(false)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.05]"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Quick Prompt Chips */}
-            <div className="px-4 py-2 flex items-center gap-2 overflow-x-auto border-b border-white/[0.04] scrollbar-none bg-black/20">
-              {[
-                "Quick 20-min workout tweak?",
-                "High protein snack ideas?",
-                "Fix lower back tightness",
-              ].map((chip, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleSendMessage(chip)}
-                  className="text-[10px] whitespace-nowrap px-2.5 py-1 rounded-full bg-white/[0.03] hover:bg-violet-500/20 hover:text-violet-300 border border-white/[0.06] text-zinc-400 transition"
-                >
-                  {chip}
-                </button>
-              ))}
-            </div>
-
-            {/* Chat Messages */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-3">
-              {chatMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed ${
-                      msg.sender === "user"
-                        ? "bg-violet-600 text-white rounded-br-none"
-                        : "bg-white/[0.04] border border-white/[0.07] text-zinc-200 rounded-bl-none"
-                    }`}
-                  >
-                    <p className="whitespace-pre-line">{msg.text}</p>
-                  </div>
+            ))}
+            {chatLoading && (
+              <div className="flex justify-start">
+                <div className="p-3 rounded-2xl bg-slate-100 border border-slate-200 text-xs text-slate-500 dark:bg-white/[0.04] dark:border-white/[0.07] dark:text-zinc-400 flex items-center gap-2">
+                  <RefreshCw size={12} className="animate-spin text-violet-500 dark:text-violet-400" />
+                  Kinetic Coach is analyzing...
                 </div>
-              ))}
-              {chatLoading && (
-                <div className="flex justify-start">
-                  <div className="p-3 rounded-2xl bg-white/[0.04] border border-white/[0.07] text-xs text-zinc-400 flex items-center gap-2">
-                    <RefreshCw size={12} className="animate-spin text-violet-400" />
-                    Kinetic Coach is analyzing...
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Input Box */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendMessage();
-              }}
-              className="p-3 border-t border-white/[0.06] bg-black/40 flex items-center gap-2"
-            >
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Ask about exercises, form, macros..."
-                className="flex-1 h-10 rounded-xl bg-white/[0.03] border border-white/[0.08] px-3 text-xs text-white outline-none focus:border-violet-500"
-              />
-              <button
-                type="submit"
-                disabled={chatLoading || !chatInput.trim()}
-                className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center transition disabled:opacity-40 cursor-pointer"
-              >
-                <ArrowRight size={16} />
-              </button>
-            </form>
+              </div>
+            )}
           </div>
-        )}
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendMessage();
+            }}
+            className="p-3 border-t border-slate-200 dark:border-white/[0.06] bg-slate-50 dark:bg-black/40 flex items-center gap-2"
+          >
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Ask about exercises, form, macros..."
+              className="flex-1 h-10 rounded-xl bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/[0.08] px-3 text-xs text-slate-900 dark:text-white outline-none focus:border-violet-500"
+            />
+            <button
+              type="submit"
+              disabled={chatLoading || !chatInput.trim()}
+              className="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 text-white flex items-center justify-center transition disabled:opacity-40 cursor-pointer"
+            >
+              <ArrowRight size={16} />
+            </button>
+          </form>
+        </div>
+      )}
 
       {/* ================= MAIN CONTENT AREA ================= */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="px-6 py-4 border-b border-white/[0.06] bg-[#07070b]/60 backdrop-blur-xl flex items-center justify-between sticky top-0 z-30">
+        <header className="px-6 py-4 border-b border-slate-200 dark:border-white/[0.06] bg-white/70 dark:bg-[#07070b]/60 backdrop-blur-xl flex items-center justify-between sticky top-0 z-30 transition-colors">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.35)] shrink-0">
               <Activity size={16} className="text-white" />
             </div>
-            <span className="text-base font-bold tracking-tight text-white leading-none">
-              Kinetic<span className="text-violet-500">OS</span>
+            <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white leading-none">
+              Kinetic<span className="text-violet-600 dark:text-violet-500">OS</span>
             </span>
-            <span className="text-zinc-600 font-light text-lg select-none">/</span>
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-violet-600/15 border border-violet-500/30 text-violet-300 text-xs font-semibold tracking-wide">
+            <span className="text-slate-300 dark:text-zinc-600 font-light text-lg select-none">/</span>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-700 dark:text-violet-300 text-xs font-semibold tracking-wide">
               {activeTab === "overview" && <LayoutDashboard size={13} />}
               {activeTab === "workout" && <Dumbbell size={13} />}
               {activeTab === "nutrition" && <Utensils size={13} />}
@@ -921,104 +899,110 @@ const handleActivateMicro = () => {
           </div>
 
           <div className="flex items-center gap-2 text-xs">
-            <span className="hidden sm:inline-block text-[11px] text-zinc-400 mr-2">
-              Welcome back, <strong className="text-zinc-200">{user.name}</strong>
+            <span className="hidden sm:inline-block text-[11px] text-slate-500 dark:text-zinc-400 mr-2">
+              Welcome back, <strong className="text-slate-900 dark:text-zinc-200">{user.name}</strong>
             </span>
-            <span className="px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300 font-semibold text-[11px]">
+            <span className="px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300 font-semibold text-[11px]">
               {profile.primaryGoal}
             </span>
             <span
               className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold capitalize ${
                 isVeg
-                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300"
-                  : "bg-amber-500/10 border-amber-500/20 text-amber-300"
+                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                  : "bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300"
               }`}
             >
               {profile.dietaryPreference || "Non-Veg"}
             </span>
+
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="p-1.5 rounded-xl border border-slate-200 dark:border-white/[0.08] bg-slate-100 hover:bg-slate-200 dark:bg-white/[0.03] text-slate-700 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-white/[0.08] transition cursor-pointer ml-1"
+              title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
           </div>
         </header>
 
-        
-
         <main className="flex-1 p-6 lg:p-8 max-w-6xl w-full mx-auto">
-          
           {/* ================= 5 BALANCED METRICS STRIP ================= */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-8">
             {/* 1. Active Goal */}
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
-              <div className="flex items-center justify-between text-zinc-400">
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm dark:bg-white/[0.03] dark:border-white/[0.07] dark:shadow-none backdrop-blur-xl transition-colors">
+              <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400">
                 <span className="text-[10px] uppercase tracking-wider font-semibold">Active Goal</span>
-                <Target size={15} className="text-violet-400" />
+                <Target size={15} className="text-violet-500 dark:text-violet-400" />
               </div>
-              <p className="text-base font-bold mt-2 text-white truncate">{profile.primaryGoal || "Adaptive Plan"}</p>
-              <span className="text-[10px] text-zinc-500 capitalize">{profile.experienceLevel} • {profile.dietaryPreference}</span>
+              <p className="text-base font-bold mt-2 text-slate-900 dark:text-white truncate">{profile.primaryGoal || "Adaptive Plan"}</p>
+              <span className="text-[10px] text-slate-500 dark:text-zinc-500 capitalize">{profile.experienceLevel} • {profile.dietaryPreference}</span>
             </div>
 
             {/* 2. Target Fuel */}
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
-              <div className="flex items-center justify-between text-zinc-400">
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm dark:bg-white/[0.03] dark:border-white/[0.07] dark:shadow-none backdrop-blur-xl transition-colors">
+              <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400">
                 <span className="text-[10px] uppercase tracking-wider font-semibold">Target Fuel</span>
-                <Flame size={15} className="text-amber-400" />
+                <Flame size={15} className="text-amber-500 dark:text-amber-400" />
               </div>
-              <p className="text-base font-bold mt-2 text-amber-300">
-                {profile.targetCalories || 2000} <span className="text-xs text-zinc-400">kcal</span>
+              <p className="text-base font-bold mt-2 text-amber-600 dark:text-amber-300">
+                {profile.targetCalories || 2000} <span className="text-xs text-slate-500 dark:text-zinc-400">kcal</span>
               </p>
-              <span className="text-[10px] text-zinc-500">Maint: {profile.maintenanceCalories || 2500} kcal</span>
+              <span className="text-[10px] text-slate-500 dark:text-zinc-500">Maint: {profile.maintenanceCalories || 2500} kcal</span>
             </div>
 
             {/* 3. BODY MASS INDEX (BMI) */}
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
-              <div className="flex items-center justify-between text-zinc-400">
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm dark:bg-white/[0.03] dark:border-white/[0.07] dark:shadow-none backdrop-blur-xl transition-colors">
+              <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400">
                 <span className="text-[10px] uppercase tracking-wider font-semibold">Body Mass Index</span>
-                <TrendingUp size={15} className="text-emerald-400" />
+                <TrendingUp size={15} className="text-emerald-500 dark:text-emerald-400" />
               </div>
-              <p className="text-base font-bold mt-2 text-white">{profile.bmi || "21.1"}</p>
-              <span className="text-[10px] text-zinc-500">{profile.currentWeight || 67} kg → Goal: {profile.targetWeight || 50} kg</span>
+              <p className="text-base font-bold mt-2 text-slate-900 dark:text-white">{profile.bmi || "21.1"}</p>
+              <span className="text-[10px] text-slate-500 dark:text-zinc-500">{profile.currentWeight || 67} kg → Goal: {profile.targetWeight || 50} kg</span>
             </div>
 
-           {/* Hydration */}
-                <div className="p-4 rounded-2xl bg-[#0f0f15] border border-white/[0.06]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
-                      Hydration
-                    </span>
-                    <Droplets size={14} className="text-blue-400" />
-                  </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-sm font-bold text-blue-400">
-                      {dailyLog?.waterMl || 0}
-                    </span>
-                    <span className="text-xs text-zinc-500">
-                      / {dailyLog?.waterTargetMl || activeAnalytics?.dynamicWaterTarget || 3000} ml
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <button
-                      onClick={() => handleHydrationUpdate(250)}
-                      className="px-2 py-0.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 font-mono text-[10px] border border-blue-500/20 transition"
-                    >
-                      +250
-                    </button>
-                    <button
-                      onClick={() => handleHydrationUpdate(-250)}
-                      className="px-2 py-0.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] text-zinc-400 font-mono text-[10px] border border-white/[0.06] transition"
-                    >
-                      -250
-                    </button>
-                  </div>
-                </div>
-
-           {/* 5. Habit Engine & Streak (Combined) */}
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl">
-              <div className="flex items-center justify-between text-zinc-400">
-                <span className="text-[10px] uppercase tracking-wider font-semibold">Habit Engine</span>
-                <span className="text-xs">🔥 {analytics?.streak || 1}d</span>
+            {/* 4. Hydration */}
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#0f0f15] dark:border-white/[0.06] dark:shadow-none transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-mono text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                  Hydration
+                </span>
+                <Droplets size={14} className="text-blue-500 dark:text-blue-400" />
               </div>
-              <p className="text-base font-bold mt-2 text-purple-300">
-                {dailyLog?.habitScore || 0}<span className="text-xs text-zinc-400">/100</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                  {dailyLog?.waterMl || 0}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-zinc-500">
+                  / {dailyLog?.waterTargetMl || activeAnalytics?.dynamicWaterTarget || 3000} ml
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-2">
+                <button
+                  onClick={() => handleHydrationUpdate(250)}
+                  className="px-2 py-0.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-300 font-mono text-[10px] border border-blue-500/20 transition cursor-pointer"
+                >
+                  +250
+                </button>
+                <button
+                  onClick={() => handleHydrationUpdate(-250)}
+                  className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-white/[0.03] dark:hover:bg-white/[0.08] dark:text-zinc-400 font-mono text-[10px] border border-slate-200 dark:border-white/[0.06] transition cursor-pointer"
+                >
+                  -250
+                </button>
+              </div>
+            </div>
+
+            {/* 5. Habit Engine & Streak */}
+            <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm dark:bg-white/[0.03] dark:border-white/[0.07] dark:shadow-none backdrop-blur-xl transition-colors">
+              <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400">
+                <span className="text-[10px] uppercase tracking-wider font-semibold">Habit Engine</span>
+                <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">🔥 {analytics?.streak || 1}d</span>
+              </div>
+              <p className="text-base font-bold mt-2 text-purple-700 dark:text-purple-300">
+                {dailyLog?.habitScore || 0}<span className="text-xs text-slate-500 dark:text-zinc-400">/100</span>
               </p>
-              <div className="w-full bg-white/[0.08] h-1.5 rounded-full mt-2 overflow-hidden">
+              <div className="w-full bg-slate-200 dark:bg-white/[0.08] h-1.5 rounded-full mt-2 overflow-hidden">
                 <div
                   className="bg-gradient-to-r from-violet-500 to-purple-500 h-full rounded-full transition-all duration-500"
                   style={{ width: `${dailyLog?.habitScore || 0}%` }}
@@ -1026,126 +1010,128 @@ const handleActivateMicro = () => {
               </div>
             </div>
           </div>
-{/* ================= 1. DEDICATED HABIT ENGINE SCORE ALERT (< 45%) ================= */}
-{(() => {
-  const currentScore = Number(
-    dailyLog?.habitScore !== undefined
-      ? dailyLog.habitScore
-      : activeAnalytics?.habitData?.habitScore ?? 0
-  );
 
-  if (currentScore >= 45) return null;
+          {/* ================= 1. DEDICATED HABIT ENGINE SCORE ALERT (< 45%) ================= */}
+          {(() => {
+            const currentScore = Number(
+              dailyLog?.habitScore !== undefined
+                ? dailyLog.habitScore
+                : activeAnalytics?.habitData?.habitScore ?? 0
+            );
 
-  return (
-    <div className="mb-4 p-4 rounded-3xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 animate-pulse">
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400 shrink-0">
-          <ShieldAlert size={18} />
-        </div>
-        <div>
-          <h4 className="text-xs font-bold text-rose-300 uppercase tracking-wide">
-            Habit Engine Warning • Score at {currentScore}%
-          </h4>
-          <p className="text-[11px] text-zinc-300 mt-0.5">
-            Stay hydrated, complete your scheduled workout, and hit your nutrition goals today to restore your balance.
-          </p>
-        </div>
-      </div>
-      <span className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0">
-        Needs Action
-      </span>
-    </div>
-  );
-})()}
+            if (currentScore >= 45) return null;
 
-{/* ================= 2. DROP-OFF RISK / MICRO-WORKOUT INTERVENTION ================= */}
-{activeAnalytics?.riskAssessment?.isAtRisk && (
-  <div className="mb-6 p-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-    <div className="flex items-center gap-3">
-      <div className="p-2 rounded-xl bg-amber-500/20 text-amber-300 shrink-0">
-        <ShieldAlert size={18} />
-      </div>
-      <div>
-        <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wide">
-          Streak At Risk • {activeAnalytics?.riskAssessment?.reason || "Momentum slipping"}
-        </h4>
-        <p className="text-[11px] text-zinc-400">
-          Momentum is slipping. Lower the bar today to protect your habit loop.
-        </p>
-      </div>
-    </div>
+            return (
+              <div className="mb-4 p-4 rounded-3xl bg-rose-50 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30 flex items-center justify-between gap-3 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 shrink-0">
+                    <ShieldAlert size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wide">
+                      Habit Engine Warning • Score at {currentScore}%
+                    </h4>
+                    <p className="text-[11px] text-slate-600 dark:text-zinc-300 mt-0.5">
+                      Stay hydrated, complete your scheduled workout, and hit your nutrition goals today to restore your balance.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 shrink-0">
+                  Needs Action
+                </span>
+              </div>
+            );
+          })()}
 
-   <button
-      onClick={() => handleHydrationUpdate(250)}
-      className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-black font-semibold text-xs shrink-0 hover:bg-amber-400 transition"
-    >
-      {activeAnalytics.riskAssessment.actionText}
-    </button>
-  </div>
-)}
+          {/* ================= 2. DROP-OFF RISK / MICRO-WORKOUT INTERVENTION ================= */}
+          {activeAnalytics?.riskAssessment?.isAtRisk && (
+            <div className="mb-6 p-4 rounded-3xl bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-300 shrink-0">
+                  <ShieldAlert size={18} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wide">
+                    Streak At Risk • {activeAnalytics?.riskAssessment?.reason || "Momentum slipping"}
+                  </h4>
+                  <p className="text-[11px] text-slate-600 dark:text-zinc-400">
+                    Momentum is slipping. Lower the bar today to protect your habit loop.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleActivateMicro}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-500 text-black font-semibold text-xs shrink-0 hover:bg-amber-400 transition cursor-pointer"
+              >
+                {isMicroWorkoutActive
+                  ? "Micro-Workout Active ✓"
+                  : activeAnalytics?.riskAssessment?.actionText || "Activate Emergency 15-Minute Micro-Workout"}
+              </button>
+            </div>
+          )}
 
           {/* ================= RECOVERY & ADAPTIVE ALERT BANNER ================= */}
-<div className="mb-6 p-4 rounded-3xl bg-gradient-to-r from-violet-950/40 via-[#111118] to-[#111118] border border-violet-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
-  <div className="flex items-start sm:items-center gap-3.5">
-    <div className={`p-2.5 rounded-2xl border shrink-0 ${
-      recoveryInfo.forceRecoveryDay
-        ? "bg-rose-500/20 border-rose-500/40 text-rose-300"
-        : "bg-violet-600/20 border-violet-500/40 text-violet-300"
-    }`}>
-      {recoveryInfo.forceRecoveryDay ? <ShieldAlert size={20} /> : <HeartPulse size={20} />}
-    </div>
-    <div>
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-bold text-white">
-          Recovery State: {recoveryInfo.latestEnergy}
-        </span>
-        {recoveryInfo.forceRecoveryDay && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold">
-            Recovery Forced
-          </span>
-        )}
-      </div>
-      <p className="text-xs text-zinc-400 mt-0.5">{recoveryInfo.guidance}</p>
-    </div>
-  </div>
+          <div className="mb-6 p-4 rounded-3xl bg-gradient-to-r from-violet-50 via-white to-white border border-violet-200 dark:from-violet-950/40 dark:via-[#111118] dark:to-[#111118] dark:border-violet-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-none">
+            <div className="flex items-start sm:items-center gap-3.5">
+              <div className={`p-2.5 rounded-2xl border shrink-0 ${
+                recoveryInfo.forceRecoveryDay
+                  ? "bg-rose-500/20 border-rose-500/40 text-rose-600 dark:text-rose-300"
+                  : "bg-violet-600/20 border-violet-500/40 text-violet-600 dark:text-violet-300"
+              }`}>
+                {recoveryInfo.forceRecoveryDay ? <ShieldAlert size={20} /> : <HeartPulse size={20} />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    Recovery State: {recoveryInfo.latestEnergy}
+                  </span>
+                  {recoveryInfo.forceRecoveryDay && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-700 dark:text-rose-300 font-bold">
+                      Recovery Forced
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">{recoveryInfo.guidance}</p>
+              </div>
+            </div>
 
-  <div className="flex items-center gap-3 shrink-0">
-   <div className="px-3.5 py-1.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-right">
-  <span className="text-[10px] text-zinc-500 uppercase font-mono block">
-    Projected Completion
-  </span>
-  <span className="text-xs font-bold text-emerald-400 font-mono flex items-center gap-1 justify-end">
-    <CalendarCheck size={12} />{" "}
-    {activeAnalytics?.goalForecastDate || profile?.goalForecastDate || "Calculating..."}
-  </span>
-</div>
-  </div>
-</div>
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="px-3.5 py-1.5 rounded-2xl bg-white border border-slate-200 dark:bg-white/[0.03] dark:border-white/[0.08] text-right shadow-sm dark:shadow-none">
+                <span className="text-[10px] text-slate-500 dark:text-zinc-500 uppercase font-mono block">
+                  Projected Completion
+                </span>
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1 justify-end">
+                  <CalendarCheck size={12} />{" "}
+                  {activeAnalytics?.goalForecastDate || profile?.goalForecastDate || "Calculating..."}
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* ================= TAB 1: TODAY'S OVERVIEW ================= */}
           {activeTab === "overview" && (
             <div className="grid lg:grid-cols-2 gap-8">
-              {/* Today's Workout Card with Checkboxes and Smart Swap */}
-              <div className="rounded-3xl bg-[#101015]/80 border border-white/[0.08] p-6 backdrop-blur-2xl">
-                {/* 🟢 NEW HEADER WITH LIVE SESSION BUTTON */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 text-violet-400 font-bold text-xs uppercase tracking-wider">
-          <Dumbbell size={16} /> Today's Training • {currentDay}
-        </div>
-        {!todayWorkout?.isRestDay && (
-          <button
-            onClick={() => setIsActiveWorkoutOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:opacity-90 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-violet-900/30 transition cursor-pointer"
-          >
-            <Play size={12} fill="currentColor" /> Start Live Session
-          </button>
-        )}
-      </div>
+              {/* Today's Workout Card */}
+              <div className="rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none p-6 backdrop-blur-2xl transition-colors">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400 font-bold text-xs uppercase tracking-wider">
+                    <Dumbbell size={16} /> Today's Training • {currentDay}
+                  </div>
+                  {!todayWorkout?.isRestDay && (
+                    <button
+                      onClick={() => setIsActiveWorkoutOpen(true)}
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:opacity-90 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-violet-900/30 transition cursor-pointer"
+                    >
+                      <Play size={12} fill="currentColor" /> Start Live Session
+                    </button>
+                  )}
+                </div>
 
-                <h2 className="text-xl font-bold text-white mb-2">{todayWorkout?.focus || "Rest Day"}</h2>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{todayWorkout?.focus || "Rest Day"}</h2>
 
                 {todayWorkout?.isRestDay ? (
-                  <div className="p-8 text-center text-zinc-500 text-xs bg-black/20 rounded-2xl border border-white/[0.04]">
+                  <div className="p-8 text-center text-slate-500 dark:text-zinc-500 text-xs bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-200 dark:border-white/[0.04]">
                     Active recovery day. Focus on foam rolling, hydration, and light walking.
                   </div>
                 ) : (
@@ -1157,8 +1143,8 @@ const handleActivateMicro = () => {
                           key={i}
                           className={`p-3.5 rounded-xl border transition flex items-center justify-between group ${
                             isCompleted
-                              ? "bg-violet-950/25 border-violet-500/40 opacity-80"
-                              : "bg-white/[0.025] border-white/[0.05] hover:border-violet-500/30"
+                              ? "bg-violet-50 border-violet-200 dark:bg-violet-950/25 dark:border-violet-500/40 opacity-80"
+                              : "bg-slate-50 border-slate-200 hover:border-violet-300 dark:bg-white/[0.025] dark:border-white/[0.05] dark:hover:border-violet-500/30"
                           }`}
                         >
                           <div
@@ -1168,29 +1154,28 @@ const handleActivateMicro = () => {
                             <button
                               type="button"
                               className={`p-1 rounded-lg transition ${
-                                isCompleted ? "text-violet-400" : "text-zinc-600 hover:text-zinc-400"
+                                isCompleted ? "text-violet-600 dark:text-violet-400" : "text-slate-400 hover:text-slate-600 dark:text-zinc-600 dark:hover:text-zinc-400"
                               }`}
                             >
                               {isCompleted ? <CheckCircle2 size={18} /> : <Circle size={18} />}
                             </button>
                             <div>
-                              <p className={`text-sm font-semibold transition ${isCompleted ? "line-through text-zinc-400" : "text-zinc-200"}`}>
+                              <p className={`text-sm font-semibold transition ${isCompleted ? "line-through text-slate-400 dark:text-zinc-400" : "text-slate-800 dark:text-zinc-200"}`}>
                                 {ex.name}
                               </p>
-                              <p className="text-[11px] text-zinc-500 mt-0.5">{ex.formGuidance}</p>
+                              <p className="text-[11px] text-slate-500 dark:text-zinc-500 mt-0.5">{ex.formGuidance}</p>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-3 shrink-0 ml-3">
                             <div className="text-right">
-                              <span className="text-xs font-mono font-bold text-violet-300">{ex.sets} × {ex.reps}</span>
-                              <p className="text-[10px] text-zinc-600">{ex.restSeconds}s rest</p>
+                              <span className="text-xs font-mono font-bold text-violet-600 dark:text-violet-300">{ex.sets} × {ex.reps}</span>
+                              <p className="text-[10px] text-slate-500 dark:text-zinc-600">{ex.restSeconds}s rest</p>
                             </div>
 
-                            {/* Smart Swap Icon */}
                             <button
                               onClick={() => handleOpenSwap("exercise", ex, currentDay)}
-                              className="p-2 rounded-lg text-zinc-500 hover:text-violet-300 hover:bg-violet-500/10 transition cursor-pointer"
+                              className="p-2 rounded-lg text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:text-zinc-500 dark:hover:text-violet-300 dark:hover:bg-violet-500/10 transition cursor-pointer"
                               title="Swap exercise alternative"
                             >
                               <Repeat size={14} />
@@ -1203,34 +1188,32 @@ const handleActivateMicro = () => {
                 )}
               </div>
 
-              {/* Today's Diet & Macros with Smart Swap */}
-              <div className="rounded-3xl bg-[#101015]/80 border border-white/[0.08] p-6 backdrop-blur-2xl">
+              {/* Today's Diet & Macros */}
+              <div className="rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none p-6 backdrop-blur-2xl transition-colors">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-bold text-xs uppercase tracking-wider">
                     <Utensils size={16} /> Today's Nutrition • {currentDay}
                   </div>
-                  <span className="text-[10px] bg-white/[0.05] text-zinc-300 border border-white/[0.08] px-2 py-0.5 rounded-full font-mono">
+                  <span className="text-[10px] bg-slate-100 dark:bg-white/[0.05] text-slate-600 dark:text-zinc-300 border border-slate-200 dark:border-white/[0.08] px-2 py-0.5 rounded-full font-mono">
                     {todayDiet?.macros?.macroSplit || "Balanced Split"}
                   </span>
                 </div>
 
-                {/* Macro Split Bar */}
                 <div className="grid grid-cols-3 gap-2 mb-5">
-                  <div className="p-2.5 rounded-xl bg-black/30 border border-white/[0.05] text-center">
-                    <span className="text-[10px] text-zinc-500 uppercase font-semibold">Protein</span>
-                    <p className="text-sm font-bold text-violet-300 mt-0.5">{todayDiet?.macros?.proteinGrams}g</p>
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/[0.05] text-center">
+                    <span className="text-[10px] text-slate-500 dark:text-zinc-500 uppercase font-semibold">Protein</span>
+                    <p className="text-sm font-bold text-violet-600 dark:text-violet-300 mt-0.5">{todayDiet?.macros?.proteinGrams}g</p>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-black/30 border border-white/[0.05] text-center">
-                    <span className="text-[10px] text-zinc-500 uppercase font-semibold">Carbs</span>
-                    <p className="text-sm font-bold text-amber-300 mt-0.5">{todayDiet?.macros?.carbsGrams}g</p>
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/[0.05] text-center">
+                    <span className="text-[10px] text-slate-500 dark:text-zinc-500 uppercase font-semibold">Carbs</span>
+                    <p className="text-sm font-bold text-amber-600 dark:text-amber-300 mt-0.5">{todayDiet?.macros?.carbsGrams}g</p>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-black/30 border border-white/[0.05] text-center">
-                    <span className="text-[10px] text-zinc-500 uppercase font-semibold">Fats</span>
-                    <p className="text-sm font-bold text-emerald-300 mt-0.5">{todayDiet?.macros?.fatsGrams}g</p>
+                  <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-white/[0.05] text-center">
+                    <span className="text-[10px] text-slate-500 dark:text-zinc-500 uppercase font-semibold">Fats</span>
+                    <p className="text-sm font-bold text-emerald-600 dark:text-emerald-300 mt-0.5">{todayDiet?.macros?.fatsGrams}g</p>
                   </div>
                 </div>
 
-                {/* Meals List */}
                 <div className="space-y-2.5">
                   {todayDiet?.meals?.map((meal, i) => {
                     const isEaten = dailyLog?.consumedMeals?.includes(meal.mealName);
@@ -1239,8 +1222,8 @@ const handleActivateMicro = () => {
                         key={i}
                         className={`p-3.5 rounded-xl border transition flex items-start justify-between group ${
                           isEaten
-                            ? "bg-amber-950/20 border-amber-500/40 opacity-80"
-                            : "bg-white/[0.025] border-white/[0.05] hover:border-amber-500/30"
+                            ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-500/40 opacity-80"
+                            : "bg-slate-50 border-slate-200 hover:border-amber-300 dark:bg-white/[0.025] dark:border-white/[0.05] dark:hover:border-amber-500/30"
                         }`}
                       >
                         <div
@@ -1250,35 +1233,34 @@ const handleActivateMicro = () => {
                           <button
                             type="button"
                             className={`p-1 mt-0.5 rounded-lg transition ${
-                              isEaten ? "text-amber-400" : "text-zinc-600 hover:text-zinc-400"
+                              isEaten ? "text-amber-600 dark:text-amber-400" : "text-slate-400 hover:text-slate-600 dark:text-zinc-600 dark:hover:text-zinc-400"
                             }`}
                           >
                             {isEaten ? <CheckCircle2 size={18} /> : <Circle size={18} />}
                           </button>
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className={`text-xs font-bold transition ${isEaten ? "line-through text-zinc-400" : "text-white"}`}>
+                              <span className={`text-xs font-bold transition ${isEaten ? "line-through text-slate-400 dark:text-zinc-400" : "text-slate-900 dark:text-white"}`}>
                                 {meal.mealName}
                               </span>
-                              <span className="text-[10px] font-mono text-amber-400">{meal.calories} kcal</span>
+                              <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400">{meal.calories} kcal</span>
                             </div>
                             <ul className="mt-1 space-y-0.5">
                               {meal.suggestedItems?.map((item, idx) => (
-                                <li key={idx} className="text-[11px] text-zinc-400">• {item}</li>
+                                <li key={idx} className="text-[11px] text-slate-500 dark:text-zinc-400">• {item}</li>
                               ))}
                             </ul>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-3 shrink-0 ml-3">
-                          <div className="text-[10px] text-zinc-500 text-right">
+                          <div className="text-[10px] text-slate-500 dark:text-zinc-500 text-right">
                             {meal.protein}P / {meal.carbs}C / {meal.fats}F
                           </div>
 
-                          {/* Smart Swap Icon */}
                           <button
                             onClick={() => handleOpenSwap("meal", meal, currentDay)}
-                            className="p-2 rounded-lg text-zinc-500 hover:text-amber-300 hover:bg-amber-500/10 transition cursor-pointer"
+                            className="p-2 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:text-zinc-500 dark:hover:text-amber-300 dark:hover:bg-amber-500/10 transition cursor-pointer"
                             title="Swap meal alternative"
                           >
                             <Repeat size={14} />
@@ -1292,121 +1274,116 @@ const handleActivateMicro = () => {
             </div>
           )}
 
-   {/* ================= TAB 2: FULL 7-DAY WORKOUT ================= */}
-{activeTab === "workout" && (() => {
-  const activeAnalytics = analyticsData || analytics;
-  const currentEnergy =
-    activeAnalytics?.recoveryData?.latestEnergy ||
-    dailyLog?.energyLevel ||
-    "Normal";
+          {/* ================= TAB 2: FULL 7-DAY WORKOUT ================= */}
+          {activeTab === "workout" && (() => {
+            const activeAnalytics = analyticsData || analytics;
+            const currentEnergy =
+              activeAnalytics?.recoveryData?.latestEnergy ||
+              dailyLog?.energyLevel ||
+              "Normal";
 
-  const isForcedDeload = activeAnalytics?.recoveryData?.forceRecoveryDay === true;
-  const isExhausted = currentEnergy === "Exhausted" || currentEnergy === "Very Tired";
-  const isFatigued = currentEnergy === "Fatigued" || currentEnergy === "Slightly Fatigued";
+            const isForcedDeload = activeAnalytics?.recoveryData?.forceRecoveryDay === true;
+            const isExhausted = currentEnergy === "Exhausted" || currentEnergy === "Very Tired";
+            const isFatigued = currentEnergy === "Fatigued" || currentEnergy === "Slightly Fatigued";
 
-  const scheduleList =
-    weeklyWorkoutPlan?.schedule ||
-    data?.workoutPlan?.schedule ||
-    data?.schedule ||
-    [];
+            const scheduleList =
+              weeklyWorkoutPlan?.schedule ||
+              data?.workoutPlan?.schedule ||
+              data?.schedule ||
+              [];
 
-  return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-white">7-Day Progressive Workout Routine</h2>
-        <p className="text-xs text-zinc-400 mt-1">
-          Tailored for {profile?.primaryGoal || "Muscle Gain"} ({profile?.experienceLevel || "beginner"} level).
-        </p>
-      </div>
+            return (
+              <div>
+                <div className="mb-6">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">7-Day Progressive Workout Routine</h2>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
+                    Tailored for {profile?.primaryGoal || "Muscle Gain"} ({profile?.experienceLevel || "beginner"} level).
+                  </p>
+                </div>
 
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {scheduleList.map((day) => {
-          const isToday =
-            day.dayName?.trim().toLowerCase() === currentDay?.trim().toLowerCase();
-
-          return (
-            <div
-              key={day.dayName}
-              className={`p-5 rounded-2xl border transition ${
-                isToday
-                  ? "bg-violet-950/20 border-violet-500/50 shadow-lg shadow-violet-900/20"
-                  : "bg-white/[0.02] border-white/[0.06]"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold text-white">{day.dayName}</span>
-                {isToday && (
-                  <span className="text-[9px] bg-violet-500 text-white font-bold px-2 py-0.5 rounded-full">
-                    TODAY
-                  </span>
-                )}
-              </div>
-
-              <p className="text-xs text-violet-300 font-semibold mb-3">{day.focus}</p>
-
-              {day.isRestDay ? (
-                <p className="text-[11px] text-zinc-500 italic">Active rest & muscle repair</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {(day.exercises || []).map((e, idx) => {
-                    const originalSets = parseInt(e.sets, 10) || 3;
-                    let displaySets = e.sets;
-                    let displayReps = e.reps;
-
-                    // Dynamically modulate sets/reps strictly for TODAY
-                    if (isToday) {
-                      if (isForcedDeload || currentEnergy === "Exhausted") {
-                        // 50% volume cut
-                        displaySets = Math.max(1, Math.floor(originalSets / 2));
-                        displayReps = "10-12";
-                      } else if (currentEnergy === "Very Tired" || isFatigued) {
-                        // 20% volume cut (reduce by 1 working set)
-                        displaySets = Math.max(2, originalSets - 1);
-                      }
-                    }
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {scheduleList.map((day) => {
+                    const isToday =
+                      day.dayName?.trim().toLowerCase() === currentDay?.trim().toLowerCase();
 
                     return (
                       <div
-                        key={idx}
-                        className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center gap-3"
+                        key={day.dayName}
+                        className={`p-5 rounded-2xl border transition ${
+                          isToday
+                            ? "bg-violet-50 border-violet-300 shadow-md shadow-violet-100 dark:bg-violet-950/20 dark:border-violet-500/50 dark:shadow-violet-900/20"
+                            : "bg-white border-slate-200 shadow-sm dark:bg-white/[0.02] dark:border-white/[0.06] dark:shadow-none"
+                        }`}
                       >
-                        <div className="w-6 h-6 rounded-lg bg-zinc-800/80 flex items-center justify-center text-xs font-bold text-violet-400 shrink-0">
-                          {idx + 1}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">{day.dayName}</span>
+                          {isToday && (
+                            <span className="text-[9px] bg-violet-600 text-white font-bold px-2 py-0.5 rounded-full">
+                              TODAY
+                            </span>
+                          )}
                         </div>
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-semibold text-white truncate">
-                            {e.name}
-                          </h4>
-                          <p className="text-[11px] text-zinc-400">
-                            {displaySets} sets × {displayReps}
-                          </p>
-                        </div>
+
+                        <p className="text-xs text-violet-600 dark:text-violet-300 font-semibold mb-3">{day.focus}</p>
+
+                        {day.isRestDay ? (
+                          <p className="text-[11px] text-slate-500 dark:text-zinc-500 italic">Active rest & muscle repair</p>
+                        ) : (
+                          <div className="space-y-2.5">
+                            {(day.exercises || []).map((e, idx) => {
+                              const originalSets = parseInt(e.sets, 10) || 3;
+                              let displaySets = e.sets;
+                              let displayReps = e.reps;
+
+                              if (isToday) {
+                                if (isForcedDeload || currentEnergy === "Exhausted") {
+                                  displaySets = Math.max(1, Math.floor(originalSets / 2));
+                                  displayReps = "10-12";
+                                } else if (currentEnergy === "Very Tired" || isFatigued) {
+                                  displaySets = Math.max(2, originalSets - 1);
+                                }
+                              }
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className="p-3 rounded-xl bg-slate-50 border border-slate-200 dark:bg-white/[0.02] dark:border-white/[0.04] flex items-center gap-3"
+                                >
+                                  <div className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-zinc-800/80 flex items-center justify-center text-xs font-bold text-violet-600 dark:text-violet-400 shrink-0">
+                                    {idx + 1}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <h4 className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                                      {e.name}
+                                    </h4>
+                                    <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                                      {displaySets} sets × {displayReps}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-})()}
+              </div>
+            );
+          })()}
 
           {/* ================= TAB 3: FULL 7-DAY NUTRITION ================= */}
           {activeTab === "nutrition" && (
             <div>
               <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  {/* In Tab 3: Weekly Nutrition Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <div>
-                      <h2 className="text-xl font-bold text-white">7-Day Nutritional Blueprint</h2>
-                      <p className="text-xs text-zinc-400">Target: {data?.profile?.targetCalories || 2000} kcal/day</p>
+                      <h2 className="text-xl font-bold text-slate-900 dark:text-white">7-Day Nutritional Blueprint</h2>
+                      <p className="text-xs text-slate-500 dark:text-zinc-400">Target: {data?.profile?.targetCalories || 2000} kcal/day</p>
                     </div>
 
-                    {/* Grocery List & PDF Button */}
                     <button
                       onClick={() => setIsGroceryOpen(true)}
                       className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:opacity-90 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-violet-900/30 transition cursor-pointer self-start sm:self-auto"
@@ -1415,12 +1392,12 @@ const handleActivateMicro = () => {
                       <span>Smart Grocery & Export PDF</span>
                     </button>
                   </div>
-                     <h2 className="text-xl font-bold">7-Day Adaptive Nutrition Schedule</h2>
-                  <p className="text-xs text-zinc-400 mt-1 capitalize">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">7-Day Adaptive Nutrition Schedule</h2>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 capitalize">
                     {profile.dietaryPreference} • {profile.primaryGoal} ({profile.targetCalories || 2000} kcal/day)
                   </p>
                 </div>
-                <span className="text-xs px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono">
+                <span className="text-xs px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 font-mono">
                   {todayDiet?.macros?.macroSplit}
                 </span>
               </div>
@@ -1431,36 +1408,36 @@ const handleActivateMicro = () => {
                     key={day.dayName}
                     className={`p-5 rounded-2xl border transition ${
                       day.dayName === currentDay
-                        ? "bg-amber-950/20 border-amber-500/50 shadow-lg shadow-amber-900/20"
-                        : "bg-white/[0.02] border-white/[0.06]"
+                        ? "bg-amber-50 border-amber-300 shadow-md shadow-amber-100 dark:bg-amber-950/20 dark:border-amber-500/50 dark:shadow-amber-900/20"
+                        : "bg-white border-slate-200 shadow-sm dark:bg-white/[0.02] dark:border-white/[0.06] dark:shadow-none"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-white">{day.dayName}</span>
-                      <span className="text-xs font-mono font-bold text-amber-300">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">{day.dayName}</span>
+                      <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-300">
                         {day.targetCalories} kcal
                       </span>
                     </div>
-                    <p className="text-[10px] text-zinc-500 font-mono mb-3">
+                    <p className="text-[10px] text-slate-500 dark:text-zinc-500 font-mono mb-3">
                       {day.macros?.macroSplit}
                     </p>
                     <div className="space-y-2.5 text-xs">
                       {day.meals?.map((m, idx) => (
-                        <div key={idx} className="border-t border-white/[0.04] pt-2 group">
-                          <div className="flex justify-between items-center font-semibold text-zinc-300">
+                        <div key={idx} className="border-t border-slate-100 dark:border-white/[0.04] pt-2 group">
+                          <div className="flex justify-between items-center font-semibold text-slate-800 dark:text-zinc-300">
                             <span>{m.mealName}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-zinc-500 font-mono">{m.calories} kcal</span>
+                              <span className="text-slate-500 dark:text-zinc-500 font-mono">{m.calories} kcal</span>
                               <button
                                 onClick={() => handleOpenSwap("meal", m, day.dayName)}
-                                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-amber-300 transition"
+                                className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-amber-600 dark:text-zinc-500 dark:hover:text-amber-300 transition"
                                 title="Swap this meal"
                               >
                                 <Repeat size={12} />
                               </button>
                             </div>
                           </div>
-                          <p className="text-[11px] text-zinc-400 truncate mt-0.5">
+                          <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate mt-0.5">
                             {m.suggestedItems?.[0]}
                           </p>
                         </div>
@@ -1470,54 +1447,51 @@ const handleActivateMicro = () => {
                 ))}
               </div>
             </div>
-
           )}
 
-          {/* ================= TAB 4: PROGRESS ANALYTICS & CHARTS (RECHARTS) ================= */}
+          {/* ================= TAB 4: PROGRESS ANALYTICS & CHARTS ================= */}
           {activeTab === "analytics" && (
             <div className="space-y-8">
-              {/* Top Summary Cards */}
               <div className="grid md:grid-cols-3 gap-4">
-                <div className="p-6 rounded-3xl bg-gradient-to-br from-violet-950/40 via-[#101015] to-[#101015] border border-violet-500/30">
+              <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm dark:bg-gradient-to-br dark:from-violet-950/40 dark:via-[#101015] dark:to-[#101015] dark:border-violet-500/30">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-violet-300 font-bold uppercase tracking-wider">Consistency Score</span>
-                    <Award size={18} className="text-violet-400" />
+                    <span className="text-xs text-violet-700 dark:text-violet-300 font-bold uppercase tracking-wider">Consistency Score</span>
+                    <Award size={18} className="text-violet-600 dark:text-violet-400" />
                   </div>
-                  <h3 className="text-3xl font-extrabold text-white mt-3">{analytics?.weeklyAvgScore || 0}%</h3>
-                  <p className="text-xs text-zinc-400 mt-1">7-Day Composite Adherence Index</p>
+                  <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white mt-3">{analytics?.weeklyAvgScore || 0}%</h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">7-Day Composite Adherence Index</p>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-gradient-to-br from-orange-950/30 via-[#101015] to-[#101015] border border-orange-500/30">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm dark:bg-gradient-to-br dark:from-orange-950/30 dark:via-[#101015] dark:to-[#101015] dark:border-orange-500/30">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-orange-300 font-bold uppercase tracking-wider">Active Habit Streak</span>
+                    <span className="text-xs text-orange-700 dark:text-orange-300 font-bold uppercase tracking-wider">Active Habit Streak</span>
                     <span className="text-base">🔥</span>
                   </div>
-                  <h3 className="text-3xl font-extrabold text-white mt-3">{analytics?.streak ?? 0} Days</h3>
-                  <p className="text-xs text-zinc-400 mt-1">Consecutive days reaching daily targets</p>
+                  <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white mt-3">{analytics?.streak ?? 0} Days</h3>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">Consecutive days reaching daily targets</p>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-gradient-to-br from-emerald-950/30 via-[#101015] to-[#101015] border border-emerald-500/30">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm dark:bg-gradient-to-br dark:from-emerald-950/30 dark:via-[#101015] dark:to-[#101015] dark:border-emerald-500/30">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-emerald-300 font-bold uppercase tracking-wider">Body Delta</span>
-                    <Scale size={18} className="text-emerald-400" />
+                    <span className="text-xs text-emerald-700 dark:text-emerald-300 font-bold uppercase tracking-wider">Body Delta</span>
+                    <Scale size={18} className="text-emerald-600 dark:text-emerald-400" />
                   </div>
-                  <h3 className="text-3xl font-extrabold text-white mt-3">
+                  <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white mt-3">
                     {Math.abs((profile.currentWeight || 67) - (profile.targetWeight || 50))} kg
                   </h3>
-                  <p className="text-xs text-zinc-400 mt-1">Remaining until target weight achieved</p>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">Remaining until target weight achieved</p>
                 </div>
               </div>
-
               {/* Interactive Recharts 7-Day Adherence Curve */}
-              <div className="p-6 rounded-3xl bg-[#101015]/80 border border-white/[0.08] backdrop-blur-2xl">
+              <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h3 className="text-base font-bold text-white">7-Day Adherence Velocity</h3>
-                    <p className="text-xs text-zinc-500 mt-0.5">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">7-Day Adherence Velocity</h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
                       Daily combined score: Workout (50%), Nutrition (35%), Hydration (15%)
                     </p>
                   </div>
-                  <span className="text-xs font-mono text-violet-400 bg-violet-500/10 border border-violet-500/20 px-3 py-1 rounded-full">
+                  <span className="text-xs font-mono text-violet-700 dark:text-violet-400 bg-violet-500/10 border border-violet-500/20 px-3 py-1 rounded-full">
                     Target: 80%+
                   </span>
                 </div>
@@ -1534,16 +1508,16 @@ const handleActivateMicro = () => {
                           <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0a" vertical={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === "dark" ? "#ffffff0a" : "#e2e8f0"} vertical={false} />
                       <XAxis
                         dataKey="day"
-                        stroke="#71717a"
+                        stroke={theme === "dark" ? "#71717a" : "#64748b"}
                         fontSize={11}
                         tickLine={false}
                         axisLine={false}
                       />
                       <YAxis
-                        stroke="#71717a"
+                        stroke={theme === "dark" ? "#71717a" : "#64748b"}
                         fontSize={11}
                         tickLine={false}
                         axisLine={false}
@@ -1551,18 +1525,19 @@ const handleActivateMicro = () => {
                       />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: "#121218",
-                          border: "1px solid rgba(255,255,255,0.1)",
+                          backgroundColor: theme === "dark" ? "#121218" : "#ffffff",
+                          border: theme === "dark" ? "1px solid rgba(255,255,255,0.1)" : "1px solid #cbd5e1",
                           borderRadius: "12px",
                           fontSize: "12px",
-                          color: "#fff",
+                          color: theme === "dark" ? "#fff" : "#0f172a",
+                          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
                         }}
                         formatter={(value) => [`${value}%`, "Habit Score"]}
                       />
                       <Area
                         type="monotone"
                         dataKey="habitScore"
-                        stroke="#a855f7"
+                        stroke="#8b5cf6"
                         strokeWidth={3}
                         fillOpacity={1}
                         fill="url(#habitGradient)"
@@ -1572,22 +1547,18 @@ const handleActivateMicro = () => {
                 </div>
               </div>
 
-              
-
               {/* Weight Logging Card */}
-              <div className="p-6 rounded-3xl bg-[#101015]/80 border border-white/[0.08] backdrop-blur-2xl">
+              <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                   <div>
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <Scale size={18} className="text-emerald-400" /> Log Daily Weight
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Scale size={18} className="text-emerald-500 dark:text-emerald-400" /> Log Daily Weight
                     </h3>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      Current: <strong className="text-white">{profile.currentWeight} kg</strong> • BMI:{" "}
-                      <strong className="text-emerald-400">{profile.bmi}</strong>
+                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
+                      Current: <strong className="text-slate-900 dark:text-white">{profile.currentWeight} kg</strong> • BMI:{" "}
+                      <strong className="text-emerald-600 dark:text-emerald-400">{profile.bmi}</strong>
                     </p>
                   </div>
-
-
 
                   <form onSubmit={handleLogWeight} className="flex items-center gap-2">
                     <input
@@ -1596,7 +1567,7 @@ const handleActivateMicro = () => {
                       placeholder="e.g. 66.5"
                       value={newWeightInput}
                       onChange={(e) => setNewWeightInput(e.target.value)}
-                      className="w-28 h-10 rounded-xl bg-black/40 border border-white/[0.1] px-3 text-xs text-white outline-none focus:border-emerald-500 font-mono"
+                      className="w-28 h-10 rounded-xl bg-slate-50 border border-slate-200 dark:bg-black/40 dark:border-white/[0.1] px-3 text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500 font-mono"
                     />
                     <button
                       type="submit"
@@ -1607,54 +1578,99 @@ const handleActivateMicro = () => {
                   </form>
                 </div>
               </div>
+
+              {/* ================= BODY CIRCUMFERENCE DELTA TRACKER ================= */}
+<div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
+  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+    <div>
+      <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+        <Ruler size={18} className="text-violet-500 dark:text-violet-400" /> Body Circumference Analytics
+      </h3>
+      <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
+        Biometric tape tracking across 5 primary muscle groups
+      </p>
+    </div>
+    <button
+      onClick={() => setIsMeasurementOpen(true)}
+      className="px-3 py-1.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-600 dark:text-violet-300 border border-violet-500/20 text-xs font-bold transition cursor-pointer"
+    >
+      + Log Tape Stats
+    </button>
+  </div>
+
+  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    {[
+      { label: "Waist", value: dailyLog?.measurements?.waist || 82, baseline: 85 },
+      { label: "Chest", value: dailyLog?.measurements?.chest || 98, baseline: 96 },
+      { label: "Hips", value: dailyLog?.measurements?.hips || 95, baseline: 97 },
+      { label: "Arms", value: dailyLog?.measurements?.arms || 34, baseline: 32 },
+      { label: "Thighs", value: dailyLog?.measurements?.thighs || 56, baseline: 57 },
+    ].map((m) => {
+      const delta = m.value - m.baseline;
+      return (
+        <div key={m.label} className="p-3 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.02] dark:border-white/[0.04] text-center">
+          <span className="text-[10px] text-slate-500 dark:text-zinc-500 uppercase font-semibold block">
+            {m.label}
+          </span>
+          <p className="text-sm font-bold text-slate-900 dark:text-white mt-1 font-mono">
+            {m.value} <span className="text-[10px] font-normal text-slate-400">cm</span>
+          </p>
+          <span className={`text-[10px] font-mono font-semibold block mt-1 ${
+            delta < 0 ? "text-emerald-500" : delta > 0 ? "text-violet-500" : "text-slate-400"
+          }`}>
+            {delta > 0 ? `+${delta}` : delta} cm vs start
+          </span>
+        </div>
+      );
+    })}
+  </div>
+</div>
             </div>
           )}
         </main>
-       {/* In UserDashboard.jsx where ActiveWorkoutModal is rendered */}
-              <ActiveWorkoutModal
-                isOpen={isActiveWorkoutOpen}
-                onClose={() => setIsActiveWorkoutOpen(false)}
-                workoutData={todayWorkout}
-                dayName={currentDay}
-                onSessionComplete={fetchDashboardAndLogs}
-                onExerciseCompleted={async (exerciseName, isDone) => {
-                  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-                  const userId = storedUser.id || storedUser._id;
-                  const totalExercises = todayWorkout?.exercises?.length || 4;
 
-                  const isAlreadyCompleted = dailyLog?.completedExercises?.includes(exerciseName);
+        <ActiveWorkoutModal
+          isOpen={isActiveWorkoutOpen}
+          onClose={() => setIsActiveWorkoutOpen(false)}
+          workoutData={todayWorkout}
+          dayName={currentDay}
+          onSessionComplete={fetchDashboardAndLogs}
+          onExerciseCompleted={async (exerciseName, isDone) => {
+            const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+            const userId = storedUser.id || storedUser._id;
+            const totalExercises = todayWorkout?.exercises?.length || 4;
 
-                  // Only hit API if state changed
-                  if ((isDone && !isAlreadyCompleted) || (!isDone && isAlreadyCompleted)) {
-                    try {
-                      const res = await fetch("http://localhost:5000/api/log/toggle-exercise", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ userId, exerciseName, totalExercises }),
-                      });
-                      const result = await res.json();
-                      if (result.success) {
-                        setDailyLog(result.log);
+            const isAlreadyCompleted = dailyLog?.completedExercises?.includes(exerciseName);
 
-                        // Update the Analytics trend & streak dynamically
-                        const analyticsRes = await fetch(`http://localhost:5000/api/log/analytics/${userId}`);
-                        const analyticsData = await analyticsRes.json();
-                        if (analyticsData.success) setAnalytics(analyticsData);
-                      }
-                    } catch (err) {
-                      console.error("Failed to sync exercise completion:", err);
-                    }
-                  }
-                }}
-              />
+            if ((isDone && !isAlreadyCompleted) || (!isDone && isAlreadyCompleted)) {
+              try {
+                const res = await fetch("http://localhost:5000/api/log/toggle-exercise", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ userId, exerciseName, totalExercises }),
+                });
+                const result = await res.json();
+                if (result.success) {
+                  setDailyLog(result.log);
 
-          <GroceryModal
-            isOpen={isGroceryOpen}
-            onClose={() => setIsGroceryOpen(false)}
-            fullData={data}
-            userProfile={data?.profile || data?.user}
-            userName={data?.user?.name || "Athelete"}
-          />
+                  const analyticsRes = await fetch(`http://localhost:5000/api/log/analytics/${userId}`);
+                  const analyticsData = await analyticsRes.json();
+                  if (analyticsData.success) setAnalytics(analyticsData);
+                }
+              } catch (err) {
+                console.error("Failed to sync exercise completion:", err);
+              }
+            }
+          }}
+        />
+
+        <GroceryModal
+          isOpen={isGroceryOpen}
+          onClose={() => setIsGroceryOpen(false)}
+          fullData={data}
+          userProfile={data?.profile || data?.user}
+          userName={data?.user?.name || "Athlete"}
+        />
 
         <DailyCheckInModal
           isOpen={isCheckInOpen}
@@ -1665,6 +1681,14 @@ const handleActivateMicro = () => {
             fetchDashboardAndLogs();
           }}
         />
+
+        <BodyMeasurementModal
+            isOpen={isMeasurementOpen}
+            onClose={() => setIsMeasurementOpen(false)}
+            userId={user?._id || user?.id}
+            initialValues={dailyLog?.measurements || {}}
+            onSaved={fetchDashboardAndLogs}
+          />
       </div>
     </div>
   );

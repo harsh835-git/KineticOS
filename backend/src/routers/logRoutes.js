@@ -6,9 +6,11 @@ import {
   toggleMeal,
   logWater,
   logWeight,
+  logBodyMeasurements
 } from "../controllers/logController.js";
 import DailyLog from "../models/dailyLog.js";
 import { KineticEngine } from "../utils/kineticEngine.js";
+
 
 const router = express.Router();
 
@@ -24,6 +26,7 @@ router.post("/toggle-exercise", toggleExercise);
 router.post("/toggle-meal", toggleMeal);
 router.post("/water", logWater);
 router.post("/weight", logWeight);
+router.post("/measurements", logBodyMeasurements);
 
 // GET /api/log/analytics/:userId
 router.get("/analytics/:userId", async (req, res) => {

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import User from "../models/user.js";
 import DailyLog from "../models/dailyLog.js";
 import WorkoutPlan from "../models/workoutPlan.js";
@@ -321,5 +322,78 @@ export const logWeight = async (req, res) => {
   } catch (error) {
     console.error("Log Weight Error:", error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const logBodyMeasurements = async (req, res) => {
+  try {
+    const { userId, waist, chest, hips, arms, thighs } = req.body;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or missing userId",
+      });
+    }
+
+    const objectUserId = new mongoose.Types.ObjectId(userId);
+
+    // Format YYYY-MM-DD for dateString requirement
+    const todayDate = new Date();
+    const dateString = todayDate.toISOString().split("T")[0];
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Find log matching either dateString or the Date range
+    let log = await DailyLog.findOne({
+      userId: objectUserId,
+      $or: [
+        { dateString },
+        { date: { $gte: startOfDay, $lte: endOfDay } },
+      ],
+    });
+
+    const parsedMeasurements = {
+      waist: waist !== "" && !isNaN(waist) ? Number(waist) : null,
+      chest: chest !== "" && !isNaN(chest) ? Number(chest) : null,
+      hips: hips !== "" && !isNaN(hips) ? Number(hips) : null,
+      arms: arms !== "" && !isNaN(arms) ? Number(arms) : null,
+      thighs: thighs !== "" && !isNaN(thighs) ? Number(thighs) : null,
+      loggedAt: new Date(),
+    };
+
+    if (!log) {
+      log = new DailyLog({
+        userId: objectUserId,
+        date: startOfDay,
+        dateString, // <--- Satisfies the schema requirement
+        completedExercises: [],
+        consumedMeals: [],
+        waterMl: 0,
+        habitScore: 0,
+        measurements: parsedMeasurements,
+      });
+    } else {
+      if (!log.dateString) log.dateString = dateString;
+      log.measurements = parsedMeasurements;
+    }
+
+    await log.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Measurements saved successfully",
+      log,
+    });
+  } catch (err) {
+    console.error("Full Measurement Log Error Details:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Server error saving measurements",
+    });
   }
 };
