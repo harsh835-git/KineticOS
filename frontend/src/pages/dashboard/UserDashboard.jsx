@@ -138,6 +138,9 @@ const Dashboard = () => {
       const dashData = await dashRes.json();
       const logData = await logRes.json();
       const aData = await analyticsRes.json();
+      console.log(">>> [FRONTEND ANALYTICS DATA RECEIVED]:", aData);
+      console.log(">>> [FRONTEND TONNAGE BADGE VALUE]:", aData?.totalWeeklyTonnage);
+      console.log(">>> [FRONTEND TREND ARRAY]:", aData?.weeklyTrend);
 
       if (dashRes.ok) setData(dashData);
       if (logData.success) setDailyLog(logData.log);
@@ -552,6 +555,21 @@ const handleToggleExercise = async (exerciseName) => {
       console.error("Hydration update error:", err);
     }
   };
+
+  // Calculate tonnage directly from dailyLog subdocuments
+const calculatedTonnage = (dailyLog?.completedExercises || []).reduce((sum, ex) => {
+  const w = Number(ex.weight ?? ex.weightKg ?? 0);
+  const r = Number(ex.completedReps ?? ex.repsCompleted ?? ex.targetReps ?? 10);
+  return sum + w * r;
+}, 0);
+
+// Ensure today's item in weeklyTrend has the tonnage value
+const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx, arr) => {
+  if (idx === arr.length - 1) {
+    return { ...item, tonnage: item.tonnage || calculatedTonnage };
+  }
+  return { ...item, tonnage: item.tonnage || 0 };
+});
 
   return (
     <div className="max-h-screen bg-slate-50 text-slate-900 dark:bg-[#050507] dark:text-white flex relative overflow-x-hidden transition-colors duration-300">
@@ -1528,70 +1546,78 @@ const handleToggleExercise = async (exerciseName) => {
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">Remaining until target weight achieved</p>
                 </div>
               </div>
-              {/* Interactive Recharts 7-Day Adherence Curve */}
-              <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">7-Day Adherence Velocity</h3>
-                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
-                      Daily combined score: Workout (50%), Nutrition (35%), Hydration (15%)
-                    </p>
-                  </div>
-                  <span className="text-xs font-mono text-violet-700 dark:text-violet-400 bg-violet-500/10 border border-violet-500/20 px-3 py-1 rounded-full">
-                    Target: 80%+
-                  </span>
-                </div>
+              {/* ================= WEEKLY VOLUME & TONNAGE TRENDLINE ================= */}
+              {/* ================= WEEKLY VOLUME & TONNAGE TRENDLINE ================= */}
+<div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
+  <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+    <div>
+      <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+        <TrendingUp size={18} className="text-emerald-500 dark:text-emerald-400" />
+        Weekly Training Volume (Tonnage)
+      </h3>
+      <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
+        Accumulated mechanical load (weight × reps) over the last 7 days
+      </p>
+    </div>
+    <div className="text-right">
+      <span className="text-[10px] font-mono uppercase text-slate-500 dark:text-zinc-500 block">7-Day Total</span>
+     <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+  {activeAnalytics?.totalWeeklyTonnage || calculatedTonnage} kg
+</span>
+    </div>
+  </div>
 
-                <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={analytics?.weeklyTrend || []}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                    >
-                      <defs>
-                        <linearGradient id="habitGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke={theme === "dark" ? "#ffffff0a" : "#e2e8f0"} vertical={false} />
-                      <XAxis
-                        dataKey="day"
-                        stroke={theme === "dark" ? "#71717a" : "#64748b"}
-                        fontSize={11}
-                        tickLine={false}
-                        axisLine={false}
-                      />
-                      <YAxis
-                        stroke={theme === "dark" ? "#71717a" : "#64748b"}
-                        fontSize={11}
-                        tickLine={false}
-                        axisLine={false}
-                        domain={[0, 100]}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: theme === "dark" ? "#121218" : "#ffffff",
-                          border: theme === "dark" ? "1px solid rgba(255,255,255,0.1)" : "1px solid #cbd5e1",
-                          borderRadius: "12px",
-                          fontSize: "12px",
-                          color: theme === "dark" ? "#fff" : "#0f172a",
-                          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
-                        }}
-                        formatter={(value) => [`${value}%`, "Habit Score"]}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="habitScore"
-                        stroke="#8b5cf6"
-                        strokeWidth={3}
-                        fillOpacity={1}
-                        fill="url(#habitGradient)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+  <div className="h-64 w-full">
+    <ResponsiveContainer width="100%" height="100%">
+
+      
+      {/* AreaChart */}
+<AreaChart
+  data={enrichedWeeklyTrend}
+  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+>
+  <defs>
+    <linearGradient id="tonnageGradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+    </linearGradient>
+  </defs>
+  <CartesianGrid strokeDasharray="3 3" stroke={theme === "dark" ? "#ffffff0a" : "#e2e8f0"} vertical={false} />
+  <XAxis
+    dataKey="day"
+    stroke={theme === "dark" ? "#71717a" : "#64748b"}
+    fontSize={11}
+    tickLine={false}
+    axisLine={false}
+  />
+  <YAxis
+    stroke={theme === "dark" ? "#71717a" : "#64748b"}
+    fontSize={11}
+    tickLine={false}
+    axisLine={false}
+  />
+  <Tooltip
+    contentStyle={{
+      backgroundColor: theme === "dark" ? "#121218" : "#ffffff",
+      border: theme === "dark" ? "1px solid rgba(255,255,255,0.1)" : "1px solid #cbd5e1",
+      borderRadius: "12px",
+      fontSize: "12px",
+      color: theme === "dark" ? "#fff" : "#0f172a",
+    }}
+    formatter={(val) => [`${val} kg`, "Volume"]}
+  />
+  <Area
+    type="monotone"
+    dataKey="tonnage"
+    stroke="#10b981"
+    strokeWidth={3}
+    fillOpacity={1}
+    fill="url(#tonnageGradient)"
+  />
+</AreaChart>
+    </ResponsiveContainer>
+  </div>
+</div>
 
               {/* Weight Logging Card */}
               <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">

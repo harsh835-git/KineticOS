@@ -29,6 +29,7 @@ router.post("/weight", logWeight);
 router.post("/measurements", logBodyMeasurements);
 
 // GET /api/log/analytics/:userId
+// GET /api/log/analytics/:userId
 router.get("/analytics/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -44,7 +45,7 @@ router.get("/analytics/:userId", async (req, res) => {
     const goalForecastDate = KineticEngine.forecastGoalDate(
       {
         currentWeight: latestLog?.loggedWeight || latestLog?.weight,
-        targetWeight: 50, // Reads from user profile or document
+        targetWeight: 50,
         targetCalories: 2860,
         maintenanceCalories: 2560,
       },
@@ -52,10 +53,29 @@ router.get("/analytics/:userId", async (req, res) => {
       habitData.habitScore
     );
 
-    const weeklyTrend = last7Logs.map((log) => ({
-      day: log.dayName ? log.dayName.slice(0, 3) : "Day",
-      habitScore: KineticEngine.getDailyScore(log),
-    }));
+    // Calculate daily tonnage and grand cumulative total
+    let totalWeeklyTonnage = 0;
+
+    const weeklyTrend = last7Logs.map((log) => {
+      let dayTonnage = 0;
+
+      if (Array.isArray(log.completedExercises)) {
+        log.completedExercises.forEach((ex) => {
+          const w = Number(ex.weight ?? ex.weightKg ?? 0);
+          const r = Number(ex.completedReps ?? ex.repsCompleted ?? ex.targetReps ?? 10);
+          dayTonnage += w * r;
+        });
+      }
+
+      totalWeeklyTonnage += dayTonnage;
+
+      return {
+        dateString: log.dateString,
+        day: log.dayName ? log.dayName.slice(0, 3) : "Day",
+        habitScore: KineticEngine.getDailyScore(log),
+        tonnage: dayTonnage, // 👈 Required for AreaChart dataKey="tonnage"
+      };
+    });
 
     const riskAssessment = KineticEngine.assessDropOffRisk(logs, habitData.habitScore);
 
@@ -67,54 +87,15 @@ router.get("/analytics/:userId", async (req, res) => {
       habitData,
       riskAssessment,
       recoveryData,
-      goalForecastDate, 
+      goalForecastDate,
+      totalWeeklyTonnage, // 👈 Required for the top-right badge
       weeklyTrend: weeklyTrend.length
         ? weeklyTrend
-        : [{ day: "Today", habitScore: habitData.habitScore || 0 }],
+        : [{ day: "Today", habitScore: habitData.habitScore || 0, tonnage: 0 }],
     });
   } catch (error) {
     console.error("Analytics error:", error);
     return res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// POST /api/log/check-in
-router.post("/check-in", async (req, res) => {
-  try {
-    const { userId, weight, workoutStatus, dietStatus, energyLevel, measurements, notes } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ success: false, message: "User ID is required." });
-    }
-
-    const { dateString, dayName } = getTodayMeta();
-
-    const updatedLog = await DailyLog.findOneAndUpdate(
-      { userId, dateString },
-      {
-        $set: {
-          userId,
-          dateString,
-          dayName,
-          energyLevel: energyLevel || "Normal",
-          workoutStatus: workoutStatus || "Completed",
-          dietStatus: dietStatus || "Followed",
-          ...(weight ? { weight: Number(weight) } : {}),
-          ...(measurements ? { measurements } : {}),
-          ...(notes ? { notes } : {}),
-        },
-      },
-      { returnDocument: "after", upsert: true, runValidators: true }
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "Daily biometrics logged successfully!",
-      log: updatedLog,
-    });
-  } catch (error) {
-    console.error("Check-in error:", error);
-    return res.status(400).json({ success: false, message: error.message });
   }
 });
 

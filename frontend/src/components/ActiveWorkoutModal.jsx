@@ -9,6 +9,10 @@ import {
   ArrowRight,
   Volume2,
   VolumeX,
+  TrendingUp,
+  Zap,
+  Award,
+  Layers
 } from "lucide-react";
 
 // Inline Audio Utilities
@@ -77,6 +81,8 @@ const ActiveWorkoutModal = ({
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [sessionDuration, setSessionDuration] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sessionSummary, setSessionSummary] = useState(null);
 
   const timerRef = useRef(null);
   const sessionTimerRef = useRef(null);
@@ -103,33 +109,32 @@ const ActiveWorkoutModal = ({
       setSessionDuration(0);
       setRestSecondsLeft(0);
       setIsTimerRunning(false);
+      setSessionSummary(null);
     }
   }, [isOpen, workoutData]);
 
   // Session elapsed clock
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || sessionSummary) return;
 
     sessionTimerRef.current = setInterval(() => {
       setSessionDuration((prev) => prev + 1);
     }, 1000);
 
     return () => clearInterval(sessionTimerRef.current);
-  }, [isOpen]);
+  }, [isOpen, sessionSummary]);
 
   // Rest countdown logic with sound triggers
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || sessionSummary) return;
 
     if (isTimerRunning && restSecondsLeft > 0) {
       timerRef.current = setInterval(() => {
         setRestSecondsLeft((prev) => {
-          // Trigger audio beeps at 3, 2, 1
           if (soundEnabled && (prev === 3 || prev === 2 || prev === 1)) {
             playTone(520, 100, "sine");
           }
 
-          // Trigger completion sound and voice cue at 0
           if (prev <= 1) {
             clearInterval(timerRef.current);
             setIsTimerRunning(false);
@@ -147,11 +152,9 @@ const ActiveWorkoutModal = ({
     }
 
     return () => clearInterval(timerRef.current);
-  }, [isOpen, isTimerRunning, restSecondsLeft, soundEnabled]);
+  }, [isOpen, isTimerRunning, restSecondsLeft, soundEnabled, sessionSummary]);
 
-  if (!isOpen || !workoutData) {
-    return null;
-  }
+  if (!isOpen || !workoutData) return null;
 
   const currentExercise = exercises[activeExerciseIndex];
   const currentSets = (currentExercise && sessionLogs[currentExercise.name]) || [];
@@ -186,9 +189,7 @@ const ActiveWorkoutModal = ({
         if (nextStatus) {
           setRestSecondsLeft(defaultRest);
           setIsTimerRunning(true);
-          if (soundEnabled) {
-            playTone(440, 80, "sine"); // Quick confirmation click tone
-          }
+          if (soundEnabled) playTone(440, 80, "sine");
         }
 
         const hasCompletedSet = updated[exerciseName].some((s) => s.isCompleted);
@@ -204,10 +205,10 @@ const ActiveWorkoutModal = ({
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const activeUserId = userId || storedUser.id || storedUser._id;
 
-  if (!activeUserId) {
-    alert("Error: Active session cannot find a valid User ID. Please re-login.");
-    return;
-  }
+    if (!activeUserId) {
+      alert("Error: Missing user ID. Please sign in again.");
+      return;
+    }
 
     const formattedPayload = {
       userId: activeUserId,
@@ -220,23 +221,40 @@ const ActiveWorkoutModal = ({
       })),
     };
 
+    setIsSubmitting(true);
     try {
-      await fetch("http://localhost:5000/api/session/save", {
+      const res = await fetch("http://localhost:5000/api/session/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formattedPayload),
       });
 
-      if (soundEnabled) {
-        speakCue("Workout complete. Great session today!");
+      const data = await res.json();
+      if (data.success) {
+        if (soundEnabled) {
+          speakCue("Workout complete. Great session today!");
+        }
+        setSessionSummary(data.summary || {
+          totalTonnage: 0,
+          completedSetsCount: 0,
+          durationMinutes: Math.max(Math.round(sessionDuration / 60), 1),
+          density: 0,
+          exerciseProgressions: []
+        });
+      } else {
+        alert(data.message || "Failed to log session");
       }
-
-      if (onSessionComplete) onSessionComplete();
-      onClose();
     } catch (err) {
       console.error("Failed to finish session:", err);
-      onClose();
+      alert("Network error: Could not contact session API.");
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  const handleExitModal = () => {
+    if (onSessionComplete) onSessionComplete();
+    onClose();
   };
 
   const formatMinutesSeconds = (totalSec) => {
@@ -245,9 +263,94 @@ const ActiveWorkoutModal = ({
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
+  // ================= SUMMARY SCREEN =================
+  if (sessionSummary) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
+        <div className="max-w-xl w-full bg-[#0c0c12] border border-white/[0.08] rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <Award size={24} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">Session Completed!</h2>
+                <p className="text-xs text-zinc-400">{workoutData.focus} • {dayName}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleExitModal}
+              className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.1] text-zinc-400 hover:text-white transition cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Quick Metrics Grid */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.05] text-center">
+              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Total Tonnage</span>
+              <p className="text-base font-bold text-emerald-400 mt-1 font-mono">
+                {sessionSummary.totalTonnage} <span className="text-xs font-normal text-zinc-500">kg</span>
+              </p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.05] text-center">
+              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Sets Done</span>
+              <p className="text-base font-bold text-violet-400 mt-1 font-mono">
+                {sessionSummary.completedSetsCount}
+              </p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.05] text-center">
+              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Duration</span>
+              <p className="text-base font-bold text-blue-400 mt-1 font-mono">
+                {sessionSummary.durationMinutes} <span className="text-xs font-normal text-zinc-500">min</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Overload Recommendations Feed */}
+          <div className="space-y-2">
+            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">
+              Overload Progression Feed
+            </span>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {(sessionSummary.exerciseProgressions || []).map((prog, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between"
+                >
+                  <div className="min-w-0 pr-3">
+                    <p className="text-xs font-bold text-white truncate">{prog.exerciseName}</p>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">{prog.recommendation}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-xs font-bold text-violet-400 font-mono">
+                      Next: {prog.nextWeight} kg
+                    </span>
+                    <span className="block text-[10px] text-emerald-400 font-medium">
+                      {prog.setsDone} sets logged
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={handleExitModal}
+            className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-bold text-xs transition cursor-pointer shadow-lg shadow-violet-950/40"
+          >
+            Done & Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ================= LIVE WORKOUT VIEW =================
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex flex-col justify-between text-white p-4 sm:p-6 overflow-y-auto">
-      {/* Top Navigation Bar */}
+      {/* Top Bar */}
       <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] max-w-4xl w-full mx-auto">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400">
@@ -264,7 +367,6 @@ const ActiveWorkoutModal = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Sound Toggle Button */}
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
             className={`p-2 rounded-xl border transition cursor-pointer flex items-center gap-1.5 text-xs ${
@@ -272,7 +374,6 @@ const ActiveWorkoutModal = ({
                 ? "bg-violet-600/20 border-violet-500/30 text-violet-400"
                 : "bg-white/[0.04] border-white/[0.08] text-zinc-500"
             }`}
-            title={soundEnabled ? "Audio Cues Enabled" : "Audio Muted"}
           >
             {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
             <span className="hidden sm:inline font-semibold">{soundEnabled ? "Audio On" : "Muted"}</span>
@@ -287,7 +388,7 @@ const ActiveWorkoutModal = ({
         </div>
       </div>
 
-      {/* Main Execution Area */}
+      {/* Main Grid */}
       <div className="max-w-4xl w-full mx-auto py-6 grid md:grid-cols-3 gap-6 flex-1 items-start">
         {/* Left: Sequence List */}
         <div className="space-y-2 order-2 md:order-1">
@@ -328,7 +429,7 @@ const ActiveWorkoutModal = ({
           </div>
         </div>
 
-        {/* Right: Current Active Exercise Card */}
+        {/* Right: Active Movement Workspace */}
         <div className="md:col-span-2 space-y-5 order-1 md:order-2 bg-[#0f0f15] border border-white/[0.08] p-5 sm:p-6 rounded-3xl shadow-2xl">
           <div>
             <div className="flex items-center justify-between">
@@ -410,9 +511,9 @@ const ActiveWorkoutModal = ({
             ))}
           </div>
 
-          {/* Rest Countdown Bar */}
+          {/* Rest Timer */}
           {restSecondsLeft > 0 && (
-            <div className="p-4 rounded-2xl bg-violet-950/40 border border-violet-500/30 flex items-center justify-between animate-in fade-in">
+            <div className="p-4 rounded-2xl bg-violet-950/40 border border-violet-500/30 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Clock size={20} className="text-violet-400 animate-spin" />
                 <div>
@@ -465,10 +566,10 @@ const ActiveWorkoutModal = ({
         ) : (
           <button
             onClick={handleFinishSession}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 text-xs font-bold text-white flex items-center gap-2 transition shadow-lg shadow-emerald-950/40 cursor-pointer"
+            disabled={isSubmitting}
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 text-xs font-bold text-white flex items-center gap-2 transition shadow-lg shadow-emerald-950/40 cursor-pointer disabled:opacity-50"
           >
-           
-             Finish & Log Session
+            {isSubmitting ? "Calculating Overload..." : "Finish & Log Session"}
           </button>
         )}
       </div>

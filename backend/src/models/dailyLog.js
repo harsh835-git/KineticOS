@@ -21,59 +21,24 @@ const dailyLogSchema = new mongoose.Schema(
       index: true,
     },
     dateString: {
-      type: String, // format "YYYY-MM-DD" in user's local timezone
+      type: String, // YYYY-MM-DD
       required: true,
       index: true,
     },
     dayName: {
-      type: String, // e.g. "Monday"
+      type: String,
       required: true,
     },
-    // Array of completed exercise names
     completedExercises: [exerciseLogSchema],
-    
-    // Array of consumed meal names (e.g., ["Breakfast", "Lunch"])
-    consumedMeals: [
-      {
-        type: String,
-      },
-    ],
-    waterMl: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    waterTargetMl: {
-      type: Number,
-      default: 3000,
-    },
-    habitScore: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 100,
-    },
-    // Unified weight fields
-    weight: {
-      type: Number,
-      default: null,
-    },
-    loggedWeight: {
-      type: Number,
-      default: null,
-    },
-
-    // Daily Biometric Check-In fields
+    consumedMeals: [{ type: String }],
+    waterMl: { type: Number, default: 0, min: 0 },
+    waterTargetMl: { type: Number, default: 3000 },
+    habitScore: { type: Number, default: 0, min: 0, max: 100 },
+    weight: { type: Number, default: null },
+    loggedWeight: { type: Number, default: null },
     energyLevel: {
       type: String,
-      enum: [
-        "Energized",
-        "Normal",
-        "Fatigued",
-        "Exhausted",
-        "Slightly Fatigued",
-        "Very Tired",
-      ],
+      enum: ["Energized", "Normal", "Fatigued", "Exhausted", "Slightly Fatigued", "Very Tired"],
       default: "Normal",
     },
     workoutStatus: {
@@ -86,33 +51,19 @@ const dailyLogSchema = new mongoose.Schema(
       enum: ["Followed", "Mostly", "Deviated"],
       default: "Followed",
     },
+    notes: { type: String, default: "" },
     measurements: {
-      type: Map,
-      of: Number,
-      default: {},
-    },
-    notes: {
-      type: String,
-      default: "",
-    },
-
-
-    // Add inside dailyLogSchema (or as a separate Measurement schema):
-measurements: {
-  waist: { type: Number, default: null }, // in cm or inches
-  chest: { type: Number, default: null },
-  hips: { type: Number, default: null },
-  arms: { type: Number, default: null },
-  thighs: { type: Number, default: null },
-  loggedAt: { type: Date, default: Date.now }
-}
+      waist: { type: Number, default: null },
+      chest: { type: Number, default: null },
+      hips: { type: Number, default: null },
+      arms: { type: Number, default: null },
+      thighs: { type: Number, default: null },
+      loggedAt: { type: Date, default: Date.now }
+    }
   },
   { timestamps: true }
 );
 
-
-
-// Compound index so one user only has one log document per calendar day
 dailyLogSchema.index({ userId: 1, dateString: 1 }, { unique: true });
 
 const DailyLog = mongoose.models.DailyLog || mongoose.model("DailyLog", dailyLogSchema);
