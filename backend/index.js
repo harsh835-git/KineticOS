@@ -11,6 +11,8 @@ import swapRoutes from "./src/routers/swapRoutes.js"
 import coachRoutes from "./src/routers/coachRoutes.js";
 import sessionRoutes from "./src/routers/sessionRoutes.js";
 import planRoutes from "./src/routers/planRoutes.js";
+import roadmapRoutes from "./src/routers/roadmapRoutes.js";
+import trainingRoutes from"./src/routers/trainingRoutes.js";
 
 dotenv.config();
 
@@ -33,6 +35,8 @@ app.use("/api/swap", swapRoutes);
 app.use("/api/coach", coachRoutes);
 app.use("/api/session",sessionRoutes);
 app.use("/api/plan", planRoutes);
+app.use("/api/roadMap", roadmapRoutes);
+app.use("/api/training", trainingRoutes);
 
 app.get("/", (req, res) => {
   res.json({

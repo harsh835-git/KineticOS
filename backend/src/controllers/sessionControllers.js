@@ -20,7 +20,7 @@ export const saveWorkoutSession = async (req, res) => {
         durationMinutes,
         isFinished: true,
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
 
     // Sync completed exercise names to DailyLog for habit score computation

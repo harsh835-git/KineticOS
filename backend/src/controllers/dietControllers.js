@@ -571,7 +571,7 @@ export const generateDietPlan = async (req, res) => {
         dailyTargetCalories: targetCalories,
         schedule: weeklyDietSchedule,
       },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
 
     return res.status(200).json({

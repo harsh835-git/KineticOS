@@ -1,5 +1,5 @@
 import WorkoutPlan from "../models/workoutPlan.js";
-import User from "../models/user.js";
+import User from "../models/User.js";
 // Helper to construct routines across all 5 FitAI goals
 const buildWeeklyRoutine = (goal, experience) => {
   const isBeginner = experience === "beginner";
@@ -384,7 +384,7 @@ export const generateWorkoutPlan = async (req, res) => {
         schedule: weeklySchedule,
         weekNumber: 1,
       },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
 
     return res.status(200).json({

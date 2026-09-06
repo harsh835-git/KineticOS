@@ -1,6 +1,8 @@
-import User from "../models/user.js";
+import User from "../models/User.js";
 import WorkoutPlan from "../models/workoutPlan.js";
 import DietPlan from "../models/dietPlan.js";
+import Roadmap from "../models/roadMap.js";
+import { roadmapTemplates } from "./roadmapController.js";
 
 // ================= COMPLETE ONBOARDING =================
 export const completeOnboarding = async (req, res) => {
@@ -42,7 +44,7 @@ export const completeOnboarding = async (req, res) => {
     const heightInMeters = numHeight / 100;
     const bmi = parseFloat((numWeight / (heightInMeters * heightInMeters)).toFixed(1));
 
-    // 2. Mifflin-St Jeor BMR[cite: 2]
+    // 2. Mifflin-St Jeor BMR
     let bmr = 10 * numWeight + 6.25 * numHeight - 5 * numAge;
     bmr = gender === "male" ? bmr + 5 : bmr - 161;
 
@@ -59,11 +61,11 @@ export const completeOnboarding = async (req, res) => {
 
     // 3. Calorie Adjustments Based on Goal
     let targetCalories = maintenanceCalories;
-    if (primaryGoal === "Weight Loss") targetCalories -= 500;
+    if (primaryGoal === "Weight Loss" || primaryGoal === "Fat Loss") targetCalories -= 500;
     else if (primaryGoal === "Muscle Gain") targetCalories += 300;
     else if (primaryGoal === "Body Recomposition") targetCalories -= 200;
 
-    // 4. Safe Calorie Floor Enforcement[cite: 2]
+    // 4. Safe Calorie Floor Enforcement
     const minFloor = gender === "male" ? 1500 : 1200;
     if (targetCalories < minFloor) {
       targetCalories = minFloor;
@@ -88,7 +90,7 @@ export const completeOnboarding = async (req, res) => {
           targetCalories,
         },
       },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!updatedUser) {
@@ -97,6 +99,46 @@ export const completeOnboarding = async (req, res) => {
         message: "User not found.",
       });
     }
+
+    const goalMapping = {
+      // Fat Loss aliases
+      "Weight Loss": "Fat Loss",
+      "Fat Loss": "Fat Loss",
+
+      // Muscle Gain aliases
+      "Muscle Gain": "Muscle Gain",
+      "Weight Gain": "Muscle Gain",
+      "Hypertrophy": "Muscle Gain",
+
+      // Maintenance aliases
+      "Maintain Weight": "Weight Maintenance",
+      "Weight Maintenance": "Weight Maintenance",
+      "Maintain": "Weight Maintenance",
+      "Maintenance": "Weight Maintenance",
+
+      // Other targets
+      "Strength": "Strength",
+      "Body Recomposition": "Body Recomposition",
+      "Endurance": "Endurance",
+      "General Fitness": "General Fitness",
+    };
+
+    const targetTemplateKey = goalMapping[primaryGoal] || "Weight Maintenance";
+    const selectedPhases =
+      roadmapTemplates[targetTemplateKey] || roadmapTemplates["Weight Maintenance"];
+
+    // Upsert the user's roadmap with the matching phases
+    const syncedRoadmap = await Roadmap.findOneAndUpdate(
+      { userId },
+      {
+        $set: {
+          currentWeek: 1,
+          totalWeeks: 8,
+          phases: selectedPhases,
+        },
+      },
+      { returnDocument: "after", upsert: true }
+    );
 
     return res.status(200).json({
       success: true,
@@ -108,6 +150,7 @@ export const completeOnboarding = async (req, res) => {
         isOnboarded: updatedUser.isOnboarded,
         profile: updatedUser.profile,
       },
+      roadmap: syncedRoadmap,
     });
   } catch (error) {
     console.error("Onboarding Error:", error);
@@ -145,7 +188,7 @@ export const getUserProfile = async (req, res) => {
   }
 };
 
-// GET /api/user/dashboard/:userId
+// ================= GET DASHBOARD OVERVIEW =================
 export const getDashboardOverview = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -156,7 +199,15 @@ export const getDashboardOverview = async (req, res) => {
     }
 
     // Determine current day of week
-    const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const daysOfWeek = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ];
     const currentDayName = daysOfWeek[new Date().getDay()];
 
     // Fetch user's active workout and diet plans
@@ -164,8 +215,10 @@ export const getDashboardOverview = async (req, res) => {
     const dietPlan = await DietPlan.findOne({ userId });
 
     // Extract today's specific workout and meals
-    const todayWorkout = workoutPlan?.schedule?.find((day) => day.dayName === currentDayName) || null;
-    const todayDiet = dietPlan?.schedule?.find((day) => day.dayName === currentDayName) || null;
+    const todayWorkout =
+      workoutPlan?.schedule?.find((day) => day.dayName === currentDayName) || null;
+    const todayDiet =
+      dietPlan?.schedule?.find((day) => day.dayName === currentDayName) || null;
 
     return res.status(200).json({
       success: true,

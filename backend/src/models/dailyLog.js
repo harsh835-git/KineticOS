@@ -1,5 +1,17 @@
 import mongoose from "mongoose";
 
+const exerciseLogSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  set: { type: Number, default: 1 },
+  weight: { type: Number, required: true },
+  targetReps: { type: Number, required: true },
+  completedReps: { type: Number, required: true },
+  rpe: { type: Number, required: true },
+  recommendation: { type: String },
+  nextWeight: { type: Number },
+  loggedAt: { type: Date, default: Date.now }
+});
+
 const dailyLogSchema = new mongoose.Schema(
   {
     userId: {
@@ -18,11 +30,8 @@ const dailyLogSchema = new mongoose.Schema(
       required: true,
     },
     // Array of completed exercise names
-    completedExercises: [
-      {
-        type: String,
-      },
-    ],
+    completedExercises: [exerciseLogSchema],
+    
     // Array of consumed meal names (e.g., ["Breakfast", "Lunch"])
     consumedMeals: [
       {
@@ -101,7 +110,10 @@ measurements: {
   { timestamps: true }
 );
 
+
+
 // Compound index so one user only has one log document per calendar day
 dailyLogSchema.index({ userId: 1, dateString: 1 }, { unique: true });
 
-export default mongoose.model("DailyLog", dailyLogSchema);
+const DailyLog = mongoose.models.DailyLog || mongoose.model("DailyLog", dailyLogSchema);
+export default DailyLog;

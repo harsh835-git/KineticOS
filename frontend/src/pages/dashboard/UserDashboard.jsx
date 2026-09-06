@@ -52,7 +52,8 @@ import ActiveWorkoutModal from "../../components/ActiveWorkoutModal";
 import GroceryModal from "../../components/publicModals/groceryModal";
 import DailyCheckInModal from "../../components/DailyCheckInModal";
 import BodyMeasurementModal from "../../components/BodyMeasurementModal";
-
+import MultiWeekRoadmap from "../../components/MultiWeekRoadmap";
+import ExerciseTracker from "../../components/ExerciseTracker";
 const Dashboard = () => {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -65,6 +66,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMeasurementOpen, setIsMeasurementOpen] = useState(false);
+  const [roadmapData, setRoadmapData] = useState(null);
 
   // Smart Swap Modal State
   const [swapModalOpen, setSwapModalOpen] = useState(false);
@@ -148,6 +150,31 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+
+  const fetchRoadmapData = async (userId) => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/roadmap/${userId}`, {
+      headers: {
+        "Authorization": `Bearer ${localStorage.getItem("token")}` // if you require auth
+      }
+    });
+    const data = await res.json();
+    if (data.success) {
+      setRoadmapData(data.roadmap);
+    }
+  } catch (err) {
+    console.error("Roadmap Fetch Error:", err);
+  }
+};
+
+useEffect(() => {
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const userId = currentUser?._id || currentUser?.id;
+  
+  if (userId) {
+    fetchRoadmapData(userId);
+  }
+}, []);
 
   const fetchAnalytics = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -1011,6 +1038,15 @@ const Dashboard = () => {
             </div>
           </div>
 
+          {/* --- NEW: Multi-Week Roadmap Component --- */}
+          <div className="mb-6">
+            <MultiWeekRoadmap roadmap={roadmapData} />
+          </div>
+
+          <div className="mt-6">
+            <ExerciseTracker userId={user?._id || user?.id} />
+          </div>
+
           {/* ================= 1. DEDICATED HABIT ENGINE SCORE ALERT (< 45%) ================= */}
           {(() => {
             const currentScore = Number(
@@ -1045,7 +1081,7 @@ const Dashboard = () => {
 
           {/* ================= 2. DROP-OFF RISK / MICRO-WORKOUT INTERVENTION ================= */}
           {activeAnalytics?.riskAssessment?.isAtRisk && (
-            <div className="mb-6 p-4 rounded-3xl bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="mb-6 mt-6 p-4 rounded-3xl bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-300 shrink-0">
                   <ShieldAlert size={18} />
