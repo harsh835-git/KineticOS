@@ -66,6 +66,7 @@ const ActiveWorkoutModal = ({
   onClose,
   workoutData,
   dayName,
+  userId,
   onSessionComplete,
   onExerciseCompleted,
 }) => {
@@ -201,10 +202,15 @@ const ActiveWorkoutModal = ({
 
   const handleFinishSession = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-    const userId = storedUser.id || storedUser._id;
+    const activeUserId = userId || storedUser.id || storedUser._id;
+
+  if (!activeUserId) {
+    alert("Error: Active session cannot find a valid User ID. Please re-login.");
+    return;
+  }
 
     const formattedPayload = {
-      userId,
+      userId: activeUserId,
       dayName: dayName || "Today",
       focus: workoutData.focus || "Workout",
       durationMinutes: Math.max(Math.round(sessionDuration / 60), 1),
@@ -461,7 +467,8 @@ const ActiveWorkoutModal = ({
             onClick={handleFinishSession}
             className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-90 text-xs font-bold text-white flex items-center gap-2 transition shadow-lg shadow-emerald-950/40 cursor-pointer"
           >
-            Finish & Log Session
+           
+             Finish & Log Session
           </button>
         )}
       </div>

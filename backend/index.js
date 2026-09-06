@@ -13,6 +13,7 @@ import sessionRoutes from "./src/routers/sessionRoutes.js";
 import planRoutes from "./src/routers/planRoutes.js";
 import roadmapRoutes from "./src/routers/roadmapRoutes.js";
 import trainingRoutes from"./src/routers/trainingRoutes.js";
+import riskRoutes from "./src/routers/riskRoutes.js"
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use("/api/session",sessionRoutes);
 app.use("/api/plan", planRoutes);
 app.use("/api/roadMap", roadmapRoutes);
 app.use("/api/training", trainingRoutes);
+app.use("/api/risk", riskRoutes);
 
 app.get("/", (req, res) => {
   res.json({

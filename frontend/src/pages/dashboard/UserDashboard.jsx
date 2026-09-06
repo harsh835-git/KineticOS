@@ -54,6 +54,8 @@ import DailyCheckInModal from "../../components/DailyCheckInModal";
 import BodyMeasurementModal from "../../components/BodyMeasurementModal";
 import MultiWeekRoadmap from "../../components/MultiWeekRoadmap";
 import ExerciseTracker from "../../components/ExerciseTracker";
+import RiskInterventionBanner from "../../components/RiskInterventionBanner.jsx";
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -297,18 +299,21 @@ useEffect(() => {
       setChatLoading(false);
     }
   };
-
-  const handleToggleExercise = async (exerciseName) => {
+const handleToggleExercise = async (exerciseName) => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
     const totalExercises = data?.todayWorkout?.exercises?.length || 4;
 
     setDailyLog((prev) => {
       if (!prev) return prev;
-      const exists = prev.completedExercises?.includes(exerciseName);
+      const exists = prev.completedExercises?.some(
+        (item) => (typeof item === "string" ? item === exerciseName : item?.name === exerciseName)
+      );
       const updated = exists
-        ? prev.completedExercises.filter((e) => e !== exerciseName)
-        : [...(prev.completedExercises || []), exerciseName];
+        ? prev.completedExercises.filter(
+            (item) => (typeof item === "string" ? item !== exerciseName : item?.name !== exerciseName)
+          )
+        : [...(prev.completedExercises || []), { name: exerciseName, set: 1, weight: 0, rpe: 8 }];
       return { ...prev, completedExercises: updated };
     });
 
@@ -324,7 +329,6 @@ useEffect(() => {
       console.error("Failed to toggle exercise:", err);
     }
   };
-
   const handleToggleMeal = async (mealName) => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
@@ -1038,6 +1042,10 @@ useEffect(() => {
             </div>
           </div>
 
+
+            <div className="space-y-6">
+              <RiskInterventionBanner userId={user?._id || user?.id} />
+            </div>
           {/* --- NEW: Multi-Week Roadmap Component --- */}
           <div className="mb-6">
             <MultiWeekRoadmap roadmap={roadmapData} />
@@ -1173,7 +1181,9 @@ useEffect(() => {
                 ) : (
                   <div className="space-y-2.5 mt-4">
                     {todayWorkout?.exercises?.map((ex, i) => {
-                      const isCompleted = dailyLog?.completedExercises?.includes(ex.name);
+                    const isCompleted = dailyLog?.completedExercises?.some(
+                        (item) => (typeof item === "string" ? item === ex.name : item?.name === ex.name)
+                      );
                       return (
                         <div
                           key={i}
@@ -1665,40 +1675,50 @@ useEffect(() => {
           )}
         </main>
 
-        <ActiveWorkoutModal
-          isOpen={isActiveWorkoutOpen}
-          onClose={() => setIsActiveWorkoutOpen(false)}
-          workoutData={todayWorkout}
-          dayName={currentDay}
-          onSessionComplete={fetchDashboardAndLogs}
-          onExerciseCompleted={async (exerciseName, isDone) => {
-            const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-            const userId = storedUser.id || storedUser._id;
-            const totalExercises = todayWorkout?.exercises?.length || 4;
-
-            const isAlreadyCompleted = dailyLog?.completedExercises?.includes(exerciseName);
-
-            if ((isDone && !isAlreadyCompleted) || (!isDone && isAlreadyCompleted)) {
-              try {
-                const res = await fetch("http://localhost:5000/api/log/toggle-exercise", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ userId, exerciseName, totalExercises }),
-                });
-                const result = await res.json();
-                if (result.success) {
-                  setDailyLog(result.log);
-
-                  const analyticsRes = await fetch(`http://localhost:5000/api/log/analytics/${userId}`);
-                  const analyticsData = await analyticsRes.json();
-                  if (analyticsData.success) setAnalytics(analyticsData);
+      <ActiveWorkoutModal
+            isOpen={isActiveWorkoutOpen}
+            onClose={() => setIsActiveWorkoutOpen(false)}
+            userId={data?.user?._id || data?.user?.id}
+            workoutData={todayWorkout}
+            dayName={currentDay}
+            onSessionComplete={() => {
+   
+                if (typeof fetchDashboardAndLogs === "function") {
+                  fetchDashboardAndLogs();
                 }
-              } catch (err) {
-                console.error("Failed to sync exercise completion:", err);
+                window.location.reload();
+              }}
+            onExerciseCompleted={async (exerciseName, isDone) => {
+              const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+              const userId = data?.user?._id || data?.user?.id || storedUser.id || storedUser._id;
+              const totalExercises = todayWorkout?.exercises?.length || 4;
+
+              // Correctly check subdocument objects or strings
+              const isAlreadyCompleted = dailyLog?.completedExercises?.some(
+                (item) => (typeof item === "string" ? item === exerciseName : item?.name === exerciseName)
+              );
+
+              if ((isDone && !isAlreadyCompleted) || (!isDone && isAlreadyCompleted)) {
+                try {
+                  const res = await fetch("http://localhost:5000/api/log/toggle-exercise", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId, exerciseName, totalExercises }),
+                  });
+                  const result = await res.json();
+                  if (result.success) {
+                    setDailyLog(result.log);
+
+                    const analyticsRes = await fetch(`http://localhost:5000/api/log/analytics/${userId}`);
+                    const analyticsData = await analyticsRes.json();
+                    if (analyticsData.success) setAnalytics(analyticsData);
+                  }
+                } catch (err) {
+                  console.error("Failed to sync exercise completion:", err);
+                }
               }
-            }
-          }}
-        />
+            }}
+          />
 
         <GroceryModal
           isOpen={isGroceryOpen}
@@ -1725,6 +1745,7 @@ useEffect(() => {
             initialValues={dailyLog?.measurements || {}}
             onSaved={fetchDashboardAndLogs}
           />
+          
       </div>
     </div>
   );

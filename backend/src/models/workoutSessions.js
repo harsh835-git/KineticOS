@@ -24,5 +24,10 @@ const workoutSessionSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-const WorkoutSession= mongoose.model("WorkoutSession", workoutSessionSchema);
+
+// Prevent OverwriteModelError on nodemon reloads
+const WorkoutSession =
+  mongoose.models.WorkoutSession ||
+  mongoose.model("WorkoutSession", workoutSessionSchema);
+
 export default WorkoutSession;

@@ -117,32 +117,64 @@ export const toggleExercise = async (req, res) => {
 
     let log = await DailyLog.findOne({ userId, dateString });
     if (!log) {
-      log = new DailyLog({ userId, dateString, dayName });
+      log = new DailyLog({ 
+        userId, 
+        dateString, 
+        dayName,
+        completedExercises: [],
+        consumedMeals: [],
+        waterMl: 0,
+        habitScore: 0
+      });
     }
 
-    const idx = log.completedExercises.indexOf(exerciseName);
-    if (idx > -1) {
-      log.completedExercises.splice(idx, 1);
+    // Safely check for existing entry whether it is an object subdocument or legacy string
+    const existingIndex = log.completedExercises.findIndex((item) => {
+      if (typeof item === "string") return item.toLowerCase() === exerciseName.toLowerCase();
+      return item?.name?.toLowerCase() === exerciseName.toLowerCase();
+    });
+
+    if (existingIndex > -1) {
+      // Untoggle: remove matching entry
+      log.completedExercises.splice(existingIndex, 1);
     } else {
-      log.completedExercises.push(exerciseName);
+      // Toggle: push a schema-compliant subdocument object instead of a bare string
+      log.completedExercises.push({
+        name: exerciseName,
+        set: 1,
+        weight: 0,
+        targetReps: 10,
+        completedReps: 10,
+        rpe: 8,
+        recommendation: "Manual checklist log",
+        nextWeight: 0,
+        loggedAt: new Date(),
+      });
     }
+
+    // Count unique exercise names
+    const uniqueNames = new Set(
+      log.completedExercises.map((item) =>
+        typeof item === "string" ? item : item?.name
+      ).filter(Boolean)
+    );
 
     // Sync workout completion state
     const targetExCount = totalExercises || 4;
-    const isCompleted = log.completedExercises.length >= targetExCount;
-    log.workoutStatus = isCompleted ? "Completed" : log.completedExercises.length > 0 ? "Partial" : "Pending";
+    const isCompleted = uniqueNames.size >= targetExCount;
+    log.workoutStatus = isCompleted ? "Completed" : uniqueNames.size > 0 ? "Partial" : "Pending";
 
     // Dynamic hydration adjustment
     const calculatedTarget = KineticEngine.calculateHydrationTarget(log.workoutStatus, log.energyLevel || "Normal");
     log.waterTargetMl = calculatedTarget;
 
-    // Recalculate score
+    // Recalculate habit score using unique exercise count
     log.habitScore = calculateHabitScore(
-      log.completedExercises.length,
+      uniqueNames.size,
       targetExCount,
-      log.consumedMeals.length,
+      log.consumedMeals?.length || 0,
       4,
-      log.waterMl,
+      log.waterMl || 0,
       log.waterTargetMl
     );
 
