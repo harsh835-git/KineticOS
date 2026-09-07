@@ -60,7 +60,7 @@ const ExerciseTracker = ({ userId }) => {
   };
 
   return (
-    <div className="rounded-3xl border border-slate-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-2xl transition-colors dark:border-white/[0.08] dark:bg-[#101015]/80">
+    <div className="rounded-3xl border border-slate-200/80 bg-white/70 p-6 shadow-sm backdrop-blur-2xl transition-colors dark:border-white/[0.08] dark:bg-[#101015]/80 mb-6">
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">

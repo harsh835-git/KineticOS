@@ -1513,16 +1513,19 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
             </div>
           )}
 
-          {/* ================= TAB 4: PROGRESS ANALYTICS & CHARTS ================= */}
+        {/* ================= TAB 4: PROGRESS ANALYTICS & CHARTS ================= */}
           {activeTab === "analytics" && (
             <div className="space-y-8">
+              {/* Top 3 Metric Highlight Cards */}
               <div className="grid md:grid-cols-3 gap-4">
-              <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm dark:bg-gradient-to-br dark:from-violet-950/40 dark:via-[#101015] dark:to-[#101015] dark:border-violet-500/30">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm dark:bg-gradient-to-br dark:from-violet-950/40 dark:via-[#101015] dark:to-[#101015] dark:border-violet-500/30">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-violet-700 dark:text-violet-300 font-bold uppercase tracking-wider">Consistency Score</span>
                     <Award size={18} className="text-violet-600 dark:text-violet-400" />
                   </div>
-                  <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white mt-3">{analytics?.weeklyAvgScore || 0}%</h3>
+                  <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white mt-3">
+                    {activeAnalytics?.weeklyAvgScore || 0}%
+                  </h3>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">7-Day Composite Adherence Index</p>
                 </div>
 
@@ -1531,7 +1534,9 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
                     <span className="text-xs text-orange-700 dark:text-orange-300 font-bold uppercase tracking-wider">Active Habit Streak</span>
                     <span className="text-base">🔥</span>
                   </div>
-                  <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white mt-3">{analytics?.streak ?? 0} Days</h3>
+                  <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white mt-3">
+                    {activeAnalytics?.streak ?? 0} Days
+                  </h3>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">Consecutive days reaching daily targets</p>
                 </div>
 
@@ -1546,80 +1551,146 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">Remaining until target weight achieved</p>
                 </div>
               </div>
-              {/* ================= WEEKLY VOLUME & TONNAGE TRENDLINE ================= */}
-              {/* ================= WEEKLY VOLUME & TONNAGE TRENDLINE ================= */}
-<div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
-  <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-    <div>
-      <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-        <TrendingUp size={18} className="text-emerald-500 dark:text-emerald-400" />
-        Weekly Training Volume (Tonnage)
-      </h3>
-      <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
-        Accumulated mechanical load (weight × reps) over the last 7 days
-      </p>
-    </div>
-    <div className="text-right">
-      <span className="text-[10px] font-mono uppercase text-slate-500 dark:text-zinc-500 block">7-Day Total</span>
-     <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
-  {activeAnalytics?.totalWeeklyTonnage || calculatedTonnage} kg
-</span>
-    </div>
-  </div>
 
-  <div className="h-64 w-full">
-    <ResponsiveContainer width="100%" height="100%">
+              {/* 1. PREVIOUS ANALYTICS BANNER: 7-Day Adherence Velocity Curve */}
+              <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <TrendingUp size={18} className="text-violet-500 dark:text-violet-400" />
+                      7-Day Adherence Velocity
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
+                      Daily combined score: Workout (50%), Nutrition (35%), Hydration (15%)
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono text-violet-700 dark:text-violet-400 bg-violet-500/10 border border-violet-500/20 px-3 py-1 rounded-full">
+                    Target: 80%+
+                  </span>
+                </div>
 
-      
-      {/* AreaChart */}
-<AreaChart
-  data={enrichedWeeklyTrend}
-  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
->
-  <defs>
-    <linearGradient id="tonnageGradient" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-      <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-    </linearGradient>
-  </defs>
-  <CartesianGrid strokeDasharray="3 3" stroke={theme === "dark" ? "#ffffff0a" : "#e2e8f0"} vertical={false} />
-  <XAxis
-    dataKey="day"
-    stroke={theme === "dark" ? "#71717a" : "#64748b"}
-    fontSize={11}
-    tickLine={false}
-    axisLine={false}
-  />
-  <YAxis
-    stroke={theme === "dark" ? "#71717a" : "#64748b"}
-    fontSize={11}
-    tickLine={false}
-    axisLine={false}
-  />
-  <Tooltip
-    contentStyle={{
-      backgroundColor: theme === "dark" ? "#121218" : "#ffffff",
-      border: theme === "dark" ? "1px solid rgba(255,255,255,0.1)" : "1px solid #cbd5e1",
-      borderRadius: "12px",
-      fontSize: "12px",
-      color: theme === "dark" ? "#fff" : "#0f172a",
-    }}
-    formatter={(val) => [`${val} kg`, "Volume"]}
-  />
-  <Area
-    type="monotone"
-    dataKey="tonnage"
-    stroke="#10b981"
-    strokeWidth={3}
-    fillOpacity={1}
-    fill="url(#tonnageGradient)"
-  />
-</AreaChart>
-    </ResponsiveContainer>
-  </div>
-</div>
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={activeAnalytics?.weeklyTrend || []}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="habitGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === "dark" ? "#ffffff0a" : "#e2e8f0"} vertical={false} />
+                      <XAxis
+                        dataKey="day"
+                        stroke={theme === "dark" ? "#71717a" : "#64748b"}
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        stroke={theme === "dark" ? "#71717a" : "#64748b"}
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        domain={[0, 100]}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: theme === "dark" ? "#121218" : "#ffffff",
+                          border: theme === "dark" ? "1px solid rgba(255,255,255,0.1)" : "1px solid #cbd5e1",
+                          borderRadius: "12px",
+                          fontSize: "12px",
+                          color: theme === "dark" ? "#fff" : "#0f172a",
+                          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+                        }}
+                        formatter={(value) => [`${value}%`, "Habit Score"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="habitScore"
+                        stroke="#8b5cf6"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#habitGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
 
-              {/* Weight Logging Card */}
+              {/* 2. NEW BANNER: Weekly Volume & Tonnage Trendline */}
+              <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
+                <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <TrendingUp size={18} className="text-emerald-500 dark:text-emerald-400" />
+                      Weekly Training Volume (Tonnage)
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
+                      Accumulated mechanical load (weight × reps) over the last 7 days
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-mono uppercase text-slate-500 dark:text-zinc-500 block">7-Day Total</span>
+                    <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-mono">
+                      {activeAnalytics?.totalWeeklyTonnage || 0} kg
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={activeAnalytics?.weeklyTrend || []}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="tonnageGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={theme === "dark" ? "#ffffff0a" : "#e2e8f0"} vertical={false} />
+                      <XAxis
+                        dataKey="day"
+                        stroke={theme === "dark" ? "#71717a" : "#64748b"}
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        stroke={theme === "dark" ? "#71717a" : "#64748b"}
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: theme === "dark" ? "#121218" : "#ffffff",
+                          border: theme === "dark" ? "1px solid rgba(255,255,255,0.1)" : "1px solid #cbd5e1",
+                          borderRadius: "12px",
+                          fontSize: "12px",
+                          color: theme === "dark" ? "#fff" : "#0f172a",
+                          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+                        }}
+                        formatter={(value) => [`${value} kg`, "Volume"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="tonnage"
+                        stroke="#10b981"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#tonnageGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* 3. Weight Logging Card */}
               <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                   <div>
@@ -1651,52 +1722,52 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
                 </div>
               </div>
 
-              {/* ================= BODY CIRCUMFERENCE DELTA TRACKER ================= */}
-<div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
-  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-    <div>
-      <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-        <Ruler size={18} className="text-violet-500 dark:text-violet-400" /> Body Circumference Analytics
-      </h3>
-      <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
-        Biometric tape tracking across 5 primary muscle groups
-      </p>
-    </div>
-    <button
-      onClick={() => setIsMeasurementOpen(true)}
-      className="px-3 py-1.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-600 dark:text-violet-300 border border-violet-500/20 text-xs font-bold transition cursor-pointer"
-    >
-      + Log Tape Stats
-    </button>
-  </div>
+              {/* 4. Body Circumference Delta Tracker */}
+              <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Ruler size={18} className="text-violet-500 dark:text-violet-400" /> Body Circumference Analytics
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
+                      Biometric tape tracking across 5 primary muscle groups
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsMeasurementOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-violet-500/10 hover:bg-violet-500/20 text-violet-600 dark:text-violet-300 border border-violet-500/20 text-xs font-bold transition cursor-pointer"
+                  >
+                    + Log Tape Stats
+                  </button>
+                </div>
 
-  <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-    {[
-      { label: "Waist", value: dailyLog?.measurements?.waist || 82, baseline: 85 },
-      { label: "Chest", value: dailyLog?.measurements?.chest || 98, baseline: 96 },
-      { label: "Hips", value: dailyLog?.measurements?.hips || 95, baseline: 97 },
-      { label: "Arms", value: dailyLog?.measurements?.arms || 34, baseline: 32 },
-      { label: "Thighs", value: dailyLog?.measurements?.thighs || 56, baseline: 57 },
-    ].map((m) => {
-      const delta = m.value - m.baseline;
-      return (
-        <div key={m.label} className="p-3 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.02] dark:border-white/[0.04] text-center">
-          <span className="text-[10px] text-slate-500 dark:text-zinc-500 uppercase font-semibold block">
-            {m.label}
-          </span>
-          <p className="text-sm font-bold text-slate-900 dark:text-white mt-1 font-mono">
-            {m.value} <span className="text-[10px] font-normal text-slate-400">cm</span>
-          </p>
-          <span className={`text-[10px] font-mono font-semibold block mt-1 ${
-            delta < 0 ? "text-emerald-500" : delta > 0 ? "text-violet-500" : "text-slate-400"
-          }`}>
-            {delta > 0 ? `+${delta}` : delta} cm vs start
-          </span>
-        </div>
-      );
-    })}
-  </div>
-</div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {[
+                    { label: "Waist", value: dailyLog?.measurements?.waist || 82, baseline: 85 },
+                    { label: "Chest", value: dailyLog?.measurements?.chest || 98, baseline: 96 },
+                    { label: "Hips", value: dailyLog?.measurements?.hips || 95, baseline: 97 },
+                    { label: "Arms", value: dailyLog?.measurements?.arms || 34, baseline: 32 },
+                    { label: "Thighs", value: dailyLog?.measurements?.thighs || 56, baseline: 57 },
+                  ].map((m) => {
+                    const delta = m.value - m.baseline;
+                    return (
+                      <div key={m.label} className="p-3 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-white/[0.02] dark:border-white/[0.04] text-center">
+                        <span className="text-[10px] text-slate-500 dark:text-zinc-500 uppercase font-semibold block">
+                          {m.label}
+                        </span>
+                        <p className="text-sm font-bold text-slate-900 dark:text-white mt-1 font-mono">
+                          {m.value} <span className="text-[10px] font-normal text-slate-400">cm</span>
+                        </p>
+                        <span className={`text-[10px] font-mono font-semibold block mt-1 ${
+                          delta < 0 ? "text-emerald-500" : delta > 0 ? "text-violet-500" : "text-slate-400"
+                        }`}>
+                          {delta > 0 ? `+${delta}` : delta} cm vs start
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </main>
