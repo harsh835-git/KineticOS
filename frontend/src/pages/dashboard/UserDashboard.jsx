@@ -57,6 +57,7 @@ import MultiWeekRoadmap from "../../components/MultiWeekRoadmap";
 import ExerciseTracker from "../../components/ExerciseTracker";
 import RiskInterventionBanner from "../../components/RiskInterventionBanner.jsx";
 import { generateFullLifestylePDF } from "../../utils/fullReportPdfGenerator.js";
+import AnnouncementBanner from "../../components/AnnouncementBanner.jsx";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -1048,6 +1049,8 @@ useEffect(() => {
 
       {/* ================= MAIN CONTENT AREA ================= */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Global Platform Alert Banner */}
+        <AnnouncementBanner />
         <header className="px-6 py-4 border-b border-slate-200 dark:border-white/[0.06] bg-white/70 dark:bg-[#07070b]/60 backdrop-blur-xl flex items-center justify-between sticky top-0 z-30 transition-colors">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-600 flex items-center justify-center shadow-[0_0_15px_rgba(139,92,246,0.35)] shrink-0">

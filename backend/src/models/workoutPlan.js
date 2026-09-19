@@ -32,5 +32,7 @@ const workoutPlanSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const WorkoutPlan = mongoose.model("WorkoutPlan", workoutPlanSchema);
+const WorkoutPlan =
+  mongoose.models.WorkoutPlan || mongoose.model("WorkoutPlan", workoutPlanSchema);
+
 export default WorkoutPlan;

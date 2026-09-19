@@ -17,6 +17,7 @@ import riskRoutes from "./src/routers/riskRoutes.js"
 import { submitContactMessage } from "./src/controllers/contactController.js";
 
 import adminRoutes from "./src/routers/Admin/adminRoutes.js";
+import { getActiveAnnouncement } from "./src/controllers/Admin/adminController.js";
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use("/api/roadMap", roadmapRoutes);
 app.use("/api/training", trainingRoutes);
 app.use("/api/risk", riskRoutes);
 app.post("/api/contact", submitContactMessage);
+app.get("/api/announcements/active", getActiveAnnouncement);
 
 
 // admin routes

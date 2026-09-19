@@ -100,6 +100,14 @@ export const userLogin = async (req, res) => {
       });
     }
 
+    // --- SUSPENDED / BLOCKED ACCOUNT GUARD ---
+    if (user.isBlocked) {
+      return res.status(403).json({
+        success: false,
+        message: "This account has been suspended by an administrator.",
+      });
+    }
+
     // Guard against users created with OAuth who might not have a password
     if (!user.password) {
       return res.status(400).json({
@@ -118,9 +126,9 @@ export const userLogin = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id },
+      { userId: user._id, role: user.role || "user" },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "30d" }
     );
 
     return res.status(200).json({
@@ -131,7 +139,7 @@ export const userLogin = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role || "user", // <--- Added role field here
+        role: user.role || "user",
         isOnboarded: Boolean(user.isOnboarded),
       },
     });
@@ -311,18 +319,27 @@ export const googleAuth = async (req, res) => {
     });
     let isNewUser = false;
 
+    // --- SUSPENDED / BLOCKED ACCOUNT GUARD ---
+    if (user && user.isBlocked) {
+      return res.status(403).json({
+        success: false,
+        message: "This account has been suspended by an administrator.",
+      });
+    }
+
     if (!user) {
       user = await User.create({
         name,
         email,
         role: "user",
         isOnboarded: false,
+        isBlocked: false,
       });
       isNewUser = true;
     }
 
     const token = jwt.sign(
-      { userId: user._id },
+      { userId: user._id, role: user.role || "user" },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -338,7 +355,7 @@ export const googleAuth = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role || "user", // <-- Added role here
+        role: user.role || "user",
         isOnboarded: Boolean(user.isOnboarded),
       },
     });

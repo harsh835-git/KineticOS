@@ -28,6 +28,12 @@ const userSchema = new mongoose.Schema(
       default: "user",
     },
 
+  
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
+
     isOnboarded: { type: Boolean, default: false },
 
     // Health & Goal Profile Setup
