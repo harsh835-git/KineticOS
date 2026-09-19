@@ -1,5 +1,6 @@
 import Roadmap from "../models/roadMap.js";
 import User from "../models/User.js"; // Adjust path if your User model is elsewhere
+import DailyLog from "../models/dailyLog.js";
 
 export const roadmapTemplates = {
   // 1. MUSCLE GAIN (Hypertrophy)
@@ -225,22 +226,67 @@ export const getRoadmap = async (req, res) => {
   try {
     let roadmap = await Roadmap.findOne({ userId });
 
-    // Seed default 8-week mesocycle matched to user's goal if not initialized
+    // 1. Seed default roadmap if not present
     if (!roadmap) {
       const user = await User.findById(userId);
-      const userGoal = user?.goal || "Muscle Gain";
+      const rawGoal = user?.profile?.primaryGoal || user?.goal || "Muscle Gain";
 
-      // Match goal or fallback to Muscle Gain
+      const normalizedGoal =
+        rawGoal === "Weight Loss"
+          ? "Fat Loss"
+          : rawGoal === "Maintain"
+          ? "Weight Maintenance"
+          : rawGoal === "Improve Endurance"
+          ? "Endurance"
+          : rawGoal;
+
       const matchedPhases =
-        roadmapTemplates[userGoal] || roadmapTemplates["Muscle Gain"];
+        roadmapTemplates[normalizedGoal] || roadmapTemplates["Muscle Gain"];
 
       roadmap = await Roadmap.create({
         userId,
         currentWeek: 1,
         totalWeeks: 8,
-        phases: matchedPhases
+        phases: matchedPhases,
       });
     }
+
+    // 2. Count distinct completed workout sessions
+    const completedWorkoutsCount = await DailyLog.countDocuments({
+      userId,
+      workoutStatus: { $in: ["Completed", "completed"] },
+    });
+
+    // 3. Compute active training week (4 workouts per training week)
+    const workoutsPerWeek = 4;
+    let computedWeek = Math.max(1, Math.floor(completedWorkoutsCount / workoutsPerWeek) + 1);
+
+    // 4. Auto-reset cycle when mesocycle finishes (Cycle rollover past Week 8)
+    const totalMesocycleWeeks = roadmap.totalWeeks || 8;
+    if (computedWeek > totalMesocycleWeeks) {
+      computedWeek = 1;
+    }
+
+    roadmap.currentWeek = computedWeek;
+
+    // 5. Update Phase statuses dynamically
+    let accumulatedWeeks = 0;
+    roadmap.phases.forEach((phase) => {
+      const phaseStartWeek = accumulatedWeeks + 1;
+      const phaseEndWeek = accumulatedWeeks + phase.durationWeeks;
+      accumulatedWeeks += phase.durationWeeks;
+
+      if (computedWeek > phaseEndWeek) {
+        phase.status = "completed";
+      } else if (computedWeek >= phaseStartWeek && computedWeek <= phaseEndWeek) {
+        phase.status = "in-progress";
+      } else {
+        phase.status = "upcoming";
+      }
+    });
+
+    roadmap.markModified("phases");
+    await roadmap.save();
 
     return res.status(200).json({ success: true, roadmap });
   } catch (err) {

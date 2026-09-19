@@ -14,6 +14,9 @@ import planRoutes from "./src/routers/planRoutes.js";
 import roadmapRoutes from "./src/routers/roadmapRoutes.js";
 import trainingRoutes from"./src/routers/trainingRoutes.js";
 import riskRoutes from "./src/routers/riskRoutes.js"
+import { submitContactMessage } from "./src/controllers/contactController.js";
+
+import adminRoutes from "./src/routers/Admin/adminRoutes.js";
 
 dotenv.config();
 
@@ -39,6 +42,11 @@ app.use("/api/plan", planRoutes);
 app.use("/api/roadMap", roadmapRoutes);
 app.use("/api/training", trainingRoutes);
 app.use("/api/risk", riskRoutes);
+app.post("/api/contact", submitContactMessage);
+
+
+// admin routes
+app.use("/api/admin", adminRoutes);
 
 app.get("/", (req, res) => {
   res.json({

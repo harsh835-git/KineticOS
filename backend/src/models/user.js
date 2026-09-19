@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+
+    // <-- ADD ROLE FIELD FOR ADMIN OVERWATCH -->
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+    },
+
     isOnboarded: { type: Boolean, default: false },
 
     // Health & Goal Profile Setup
@@ -74,5 +82,6 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 export default User;

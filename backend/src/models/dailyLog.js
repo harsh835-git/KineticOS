@@ -9,7 +9,7 @@ const exerciseLogSchema = new mongoose.Schema({
   rpe: { type: Number, required: true },
   recommendation: { type: String },
   nextWeight: { type: Number },
-  loggedAt: { type: Date, default: Date.now }
+  loggedAt: { type: Date, default: Date.now },
 });
 
 const dailyLogSchema = new mongoose.Schema(
@@ -43,7 +43,7 @@ const dailyLogSchema = new mongoose.Schema(
     },
     workoutStatus: {
       type: String,
-      enum: ["Completed", "Partial", "Skipped"],
+      enum: ["Completed", "Partial", "Skipped", "In Progress", "in-progress", "Pending"],
       default: "Completed",
     },
     dietStatus: {
@@ -58,8 +58,8 @@ const dailyLogSchema = new mongoose.Schema(
       hips: { type: Number, default: null },
       arms: { type: Number, default: null },
       thighs: { type: Number, default: null },
-      loggedAt: { type: Date, default: Date.now }
-    }
+      loggedAt: { type: Date, default: Date.now },
+    },
   },
   { timestamps: true }
 );

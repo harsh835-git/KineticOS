@@ -18,19 +18,19 @@ const calculateNextLoadTarget = (weight, reps, rpe = 8) => {
     return {
       nextWeight: load > 0 ? load + 2.5 : 2.5,
       recommendation: "Exceeded target with reserve. +2.5 kg next session.",
-      status: "INCREMENT"
+      status: "INCREMENT",
     };
   } else if (userRpe <= 8.5) {
     return {
       nextWeight: load,
       recommendation: "Target achieved near threshold. Maintain load & build reps.",
-      status: "HOLD_VOLUME"
+      status: "HOLD_VOLUME",
     };
   } else {
     return {
       nextWeight: load,
       recommendation: "High exertion threshold reached. Solidify current load.",
-      status: "RECOVERY"
+      status: "RECOVERY",
     };
   }
 };
@@ -107,7 +107,7 @@ export const saveWorkoutSession = async (req, res) => {
           topWeight: maxLoad,
           nextWeight: target.nextWeight,
           recommendation: target.recommendation,
-          status: target.status
+          status: target.status,
         });
       }
     });
@@ -123,11 +123,9 @@ export const saveWorkoutSession = async (req, res) => {
       });
     }
 
-    // Append sets and complete workout
     dailyLog.completedExercises.push(...setsToLog);
     dailyLog.workoutStatus = "Completed";
 
-    // 4. Update adherence score (Workout 50%, Meals 35%, Hydration 15%)
     const totalPlanned = exercises.length > 0 ? exercises.length : 1;
     const workoutAdherence = Math.min(completedExerciseTypesCount / totalPlanned, 1);
     const mealAdherence = Math.min((dailyLog.consumedMeals?.length || 0) / 3, 1);
@@ -158,5 +156,37 @@ export const saveWorkoutSession = async (req, res) => {
   } catch (error) {
     console.error("Save Session Error:", error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/session/recent-weights/:userId
+export const getRecentWeights = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Fixed: Uses WorkoutSession model instead of undefined Session
+    const sessions = await WorkoutSession.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    const weightMap = {};
+
+   sessions.forEach((session) => {
+      session.exercises?.forEach((ex) => {
+        const key = (ex.exerciseName || ex.name || "").toLowerCase().trim();
+        if (key && !weightMap[key]) {
+          const completedSets =
+            ex.sets?.filter((s) => s.isCompleted && Number(s.weightKg) > 0) || [];
+          if (completedSets.length > 0) {
+            weightMap[key] = Math.max(...completedSets.map((s) => Number(s.weightKg)));
+          }
+        }
+      });
+    });
+    return res.status(200).json({ success: true, weights: weightMap });
+  } catch (err) {
+    console.error("Recent Weights Fetch Error:", err);
+    return res.status(500).json({ success: false, message: "Error fetching weights" });
   }
 };

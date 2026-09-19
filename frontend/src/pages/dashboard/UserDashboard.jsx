@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -38,6 +38,7 @@ import {
   Sun,
   Moon,
   Ruler,
+  FileText,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -55,6 +56,7 @@ import BodyMeasurementModal from "../../components/BodyMeasurementModal";
 import MultiWeekRoadmap from "../../components/MultiWeekRoadmap";
 import ExerciseTracker from "../../components/ExerciseTracker";
 import RiskInterventionBanner from "../../components/RiskInterventionBanner.jsx";
+import { generateFullLifestylePDF } from "../../utils/fullReportPdfGenerator.js";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -69,6 +71,7 @@ const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMeasurementOpen, setIsMeasurementOpen] = useState(false);
   const [roadmapData, setRoadmapData] = useState(null);
+  const [recentWeights, setRecentWeights] = useState({});
 
   // Smart Swap Modal State
   const [swapModalOpen, setSwapModalOpen] = useState(false);
@@ -119,6 +122,8 @@ const Dashboard = () => {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
+  const activePhase = roadmapData?.phases?.find((p) => p.status === "in-progress") || null;
+
   const fetchDashboardAndLogs = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
@@ -138,9 +143,6 @@ const Dashboard = () => {
       const dashData = await dashRes.json();
       const logData = await logRes.json();
       const aData = await analyticsRes.json();
-      console.log(">>> [FRONTEND ANALYTICS DATA RECEIVED]:", aData);
-      console.log(">>> [FRONTEND TONNAGE BADGE VALUE]:", aData?.totalWeeklyTonnage);
-      console.log(">>> [FRONTEND TREND ARRAY]:", aData?.weeklyTrend);
 
       if (dashRes.ok) setData(dashData);
       if (logData.success) setDailyLog(logData.log);
@@ -155,31 +157,51 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
-
-  const fetchRoadmapData = async (userId) => {
+  const fetchRecentWeights = async (uid) => {
+  if (!uid) return;
   try {
-    const res = await fetch(`http://localhost:5000/api/roadmap/${userId}`, {
-      headers: {
-        "Authorization": `Bearer ${localStorage.getItem("token")}` // if you require auth
-      }
-    });
+    const res = await fetch(`http://localhost:5000/api/session/recent-weights/${uid}`);
     const data = await res.json();
     if (data.success) {
-      setRoadmapData(data.roadmap);
+      setRecentWeights(data.weights || {});
     }
   } catch (err) {
-    console.error("Roadmap Fetch Error:", err);
+    console.error("Could not fetch recent weights:", err);
   }
 };
 
 useEffect(() => {
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const userId = currentUser?._id || currentUser?.id;
-  
-  if (userId) {
-    fetchRoadmapData(userId);
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const uid = data?.user?._id || data?.user?.id || storedUser.id || storedUser._id;
+  if (uid) {
+    fetchRecentWeights(uid);
   }
-}, []);
+}, [data?.user]);
+
+  const fetchRoadmapData = async (userId) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/roadmap/${userId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRoadmapData(data.roadmap);
+      }
+    } catch (err) {
+      console.error("Roadmap Fetch Error:", err);
+    }
+  };
+
+  useEffect(() => {
+    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const userId = currentUser?._id || currentUser?.id;
+
+    if (userId) {
+      fetchRoadmapData(userId);
+    }
+  }, []);
 
   const fetchAnalytics = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -302,19 +324,20 @@ useEffect(() => {
       setChatLoading(false);
     }
   };
-const handleToggleExercise = async (exerciseName) => {
+
+  const handleToggleExercise = async (exerciseName) => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
     const totalExercises = data?.todayWorkout?.exercises?.length || 4;
 
     setDailyLog((prev) => {
       if (!prev) return prev;
-      const exists = prev.completedExercises?.some(
-        (item) => (typeof item === "string" ? item === exerciseName : item?.name === exerciseName)
+      const exists = prev.completedExercises?.some((item) =>
+        typeof item === "string" ? item === exerciseName : item?.name === exerciseName
       );
       const updated = exists
-        ? prev.completedExercises.filter(
-            (item) => (typeof item === "string" ? item !== exerciseName : item?.name !== exerciseName)
+        ? prev.completedExercises.filter((item) =>
+            typeof item === "string" ? item !== exerciseName : item?.name !== exerciseName
           )
         : [...(prev.completedExercises || []), { name: exerciseName, set: 1, weight: 0, rpe: 8 }];
       return { ...prev, completedExercises: updated };
@@ -332,6 +355,7 @@ const handleToggleExercise = async (exerciseName) => {
       console.error("Failed to toggle exercise:", err);
     }
   };
+
   const handleToggleMeal = async (mealName) => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
     const userId = storedUser.id || storedUser._id;
@@ -477,6 +501,35 @@ const handleToggleExercise = async (exerciseName) => {
     }
   };
 
+  const calculate1RM = (w, r) => {
+    if (!w || !r || Number(r) <= 0) return 0;
+    return Math.round(Number(w) * (1 + Number(r) / 30));
+  };
+
+  const personalRecords = useMemo(() => {
+    const recordsMap = {};
+    const exercises = dailyLog?.completedExercises || [];
+
+    exercises.forEach((ex) => {
+      const name = ex.name || ex.exerciseName || "Exercise";
+      const w = Number(ex.weight ?? ex.weightKg ?? 0);
+      const r = Number(ex.completedReps ?? ex.repsCompleted ?? ex.targetReps ?? 1);
+      const est1RM = calculate1RM(w, r);
+
+      if (!recordsMap[name] || est1RM > recordsMap[name].oneRepMax) {
+        recordsMap[name] = {
+          name,
+          weight: w,
+          reps: r,
+          oneRepMax: est1RM,
+          rpe: ex.rpe || 8,
+        };
+      }
+    });
+
+    return Object.values(recordsMap);
+  }, [dailyLog]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#050507] text-slate-900 dark:text-white flex items-center justify-center">
@@ -538,11 +591,17 @@ const handleToggleExercise = async (exerciseName) => {
     const userId = storedUser.id || storedUser._id;
     if (!userId) return;
 
+    const totalExercises = data?.todayWorkout?.exercises?.length || 4;
+
     try {
       const res = await fetch("http://localhost:5000/api/log/water", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, amountMl: delta }),
+        body: JSON.stringify({ 
+          userId, 
+          amountMl: Number(delta),
+          totalExercises 
+        }),
       });
       const resData = await res.json();
       if (resData.success) {
@@ -550,26 +609,80 @@ const handleToggleExercise = async (exerciseName) => {
         if (typeof fetchAnalytics === "function") {
           fetchAnalytics();
         }
+      } else {
+        console.error("Water log backend error:", resData.message);
       }
     } catch (err) {
       console.error("Hydration update error:", err);
     }
   };
 
-  // Calculate tonnage directly from dailyLog subdocuments
-const calculatedTonnage = (dailyLog?.completedExercises || []).reduce((sum, ex) => {
-  const w = Number(ex.weight ?? ex.weightKg ?? 0);
-  const r = Number(ex.completedReps ?? ex.repsCompleted ?? ex.targetReps ?? 10);
-  return sum + w * r;
-}, 0);
+  const calculatedTonnage = (dailyLog?.completedExercises || []).reduce((sum, ex) => {
+    const w = Number(ex.weight ?? ex.weightKg ?? 0);
+    const r = Number(ex.completedReps ?? ex.repsCompleted ?? ex.targetReps ?? 10);
+    return sum + w * r;
+  }, 0);
 
-// Ensure today's item in weeklyTrend has the tonnage value
-const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx, arr) => {
-  if (idx === arr.length - 1) {
-    return { ...item, tonnage: item.tonnage || calculatedTonnage };
-  }
-  return { ...item, tonnage: item.tonnage || 0 };
-});
+  const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx, arr) => {
+    if (idx === arr.length - 1) {
+      return { ...item, tonnage: item.tonnage || calculatedTonnage };
+    }
+    return { ...item, tonnage: item.tonnage || 0 };
+  });
+
+ const handleExportFullDailyPDF = () => {
+    // 1. Safely find the daily log data across common state variable names
+    const resolvedDailyLog =
+      (typeof todayDailyLog !== "undefined" && todayDailyLog) ||
+      (typeof dailyLog !== "undefined" && dailyLog) ||
+      (typeof logData !== "undefined" && logData) ||
+      data?.dailyLog ||
+      dashboardData?.dailyLog ||
+      {};
+
+    // 2. Safely find user info
+    const resolvedUser =
+      (typeof user !== "undefined" && user) ||
+      data?.user ||
+      dashboardData?.user ||
+      JSON.parse(localStorage.getItem("user") || "{}");
+
+    // 3. Safely calculate completed sets & tonnage
+    const completedSets = resolvedDailyLog?.completedExercises || [];
+    const totalTonnage = completedSets.reduce(
+      (sum, s) =>
+        sum +
+        (Number(s.weightKg || s.weight) || 0) *
+          (Number(s.repsCompleted || s.completedReps) || 0),
+      0
+    );
+
+    const completedMovementsCount = new Set(
+      completedSets.map((e) => (e.exerciseName || e.name || "").toLowerCase())
+    ).size;
+
+    // 4. Safely locate today's planned exercises
+    const currentExercises =
+      (typeof todayWorkout !== "undefined" && todayWorkout?.exercises) ||
+      (typeof currentWorkout !== "undefined" && currentWorkout?.exercises) ||
+      workoutData?.exercises ||
+      data?.todayWorkout?.exercises ||
+      [];
+
+    // 5. Generate and download PDF
+    generateFullLifestylePDF({
+      user: resolvedUser,
+      dailyLog: resolvedDailyLog,
+      activePhase: (typeof activePhase !== "undefined" && activePhase) || data?.activePhase || {},
+      workoutSummary: {
+        totalTonnage,
+        completedCount: completedMovementsCount,
+        habitScore: resolvedDailyLog?.habitScore || 0,
+      },
+      exercises: currentExercises,
+      sessionLogs: {},
+    });
+  };
 
   return (
     <div className="max-h-screen bg-slate-50 text-slate-900 dark:bg-[#050507] dark:text-white flex relative overflow-x-hidden transition-colors duration-300">
@@ -672,7 +785,13 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
                     isActive
                       ? "bg-violet-600 text-white shadow-lg shadow-violet-900/40"
                       : "text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/[0.04]"
-                  } ${sidebarOpen ? "w-full px-3 py-2.5 justify-start" : "w-10 h-10 justify-center"}`}
+                  }`}
+                  style={{
+                    width: sidebarOpen ? "100%" : "2.5rem",
+                    height: sidebarOpen ? "auto" : "2.5rem",
+                    padding: sidebarOpen ? "0.625rem 0.75rem" : "0",
+                    justifyContent: sidebarOpen ? "flex-start" : "center",
+                  }}
                   title={!sidebarOpen ? item.label : undefined}
                 >
                   <Icon size={18} className="shrink-0" />
@@ -963,6 +1082,14 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
             >
               {profile.dietaryPreference || "Non-Veg"}
             </span>
+<button
+  type="button"
+  onClick={handleExportFullDailyPDF}
+  className="px-3.5 py-1.5 rounded-full bg-violet-100 hover:bg-violet-200 dark:bg-violet-950/40 dark:hover:bg-violet-900/50 border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+>
+  <FileText size={14} className="text-violet-600 dark:text-violet-400" />
+  <span>Export Full Daily Report (PDF)</span>
+</button>
 
             {/* Theme Toggle Button */}
             <button
@@ -1060,14 +1187,17 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
             </div>
           </div>
 
-
-            <div className="space-y-6">
-              <RiskInterventionBanner userId={user?._id || user?.id} />
-            </div>
-          {/* --- NEW: Multi-Week Roadmap Component --- */}
-          <div className="mb-6">
-            <MultiWeekRoadmap roadmap={roadmapData} />
+          <div className="space-y-6">
+            <RiskInterventionBanner userId={user?._id || user?.id} />
           </div>
+
+          {/* --- Multi-Week Roadmap Component --- */}
+            <div className="mb-6">
+              <MultiWeekRoadmap 
+                roadmap={roadmapData} 
+                onOpenMeasurement={() => setIsMeasurementOpen(true)} 
+              />
+            </div>
 
           <div className="mt-6">
             <ExerciseTracker userId={user?._id || user?.id} />
@@ -1136,11 +1266,13 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
           {/* ================= RECOVERY & ADAPTIVE ALERT BANNER ================= */}
           <div className="mb-6 p-4 rounded-3xl bg-gradient-to-r from-violet-50 via-white to-white border border-violet-200 dark:from-violet-950/40 dark:via-[#111118] dark:to-[#111118] dark:border-violet-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm dark:shadow-none">
             <div className="flex items-start sm:items-center gap-3.5">
-              <div className={`p-2.5 rounded-2xl border shrink-0 ${
-                recoveryInfo.forceRecoveryDay
-                  ? "bg-rose-500/20 border-rose-500/40 text-rose-600 dark:text-rose-300"
-                  : "bg-violet-600/20 border-violet-500/40 text-violet-600 dark:text-violet-300"
-              }`}>
+              <div
+                className={`p-2.5 rounded-2xl border shrink-0 ${
+                  recoveryInfo.forceRecoveryDay
+                    ? "bg-rose-500/20 border-rose-500/40 text-rose-600 dark:text-rose-300"
+                    : "bg-violet-600/20 border-violet-500/40 text-violet-600 dark:text-violet-300"
+                }`}
+              >
                 {recoveryInfo.forceRecoveryDay ? <ShieldAlert size={20} /> : <HeartPulse size={20} />}
               </div>
               <div>
@@ -1199,8 +1331,8 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
                 ) : (
                   <div className="space-y-2.5 mt-4">
                     {todayWorkout?.exercises?.map((ex, i) => {
-                    const isCompleted = dailyLog?.completedExercises?.some(
-                        (item) => (typeof item === "string" ? item === ex.name : item?.name === ex.name)
+                      const isCompleted = dailyLog?.completedExercises?.some((item) =>
+                        typeof item === "string" ? item === ex.name : item?.name === ex.name
                       );
                       return (
                         <div
@@ -1340,7 +1472,6 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
 
           {/* ================= TAB 2: FULL 7-DAY WORKOUT ================= */}
           {activeTab === "workout" && (() => {
-            const activeAnalytics = analyticsData || analytics;
             const currentEnergy =
               activeAnalytics?.recoveryData?.latestEnergy ||
               dailyLog?.energyLevel ||
@@ -1413,7 +1544,7 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
                                   key={idx}
                                   className="p-3 rounded-xl bg-slate-50 border border-slate-200 dark:bg-white/[0.02] dark:border-white/[0.04] flex items-center gap-3"
                                 >
-                                  <div className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-zinc-800/80 flex items-center justify-center text-xs font-bold text-violet-600 dark:text-violet-400 shrink-0">
+                                  <div className="w-6 h-6 rounded-lg bg-slate-200 dark:zinc-800/80 flex items-center justify-center text-xs font-bold text-violet-600 dark:text-violet-400 shrink-0">
                                     {idx + 1}
                                   </div>
                                   <div className="min-w-0">
@@ -1513,7 +1644,7 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
             </div>
           )}
 
-        {/* ================= TAB 4: PROGRESS ANALYTICS & CHARTS ================= */}
+          {/* ================= TAB 4: PROGRESS ANALYTICS & CHARTS ================= */}
           {activeTab === "analytics" && (
             <div className="space-y-8">
               {/* Top 3 Metric Highlight Cards */}
@@ -1620,7 +1751,7 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
                 </div>
               </div>
 
-              {/* 2. NEW BANNER: Weekly Volume & Tonnage Trendline */}
+              {/* 2. Weekly Volume & Tonnage Trendline */}
               <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
                 <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                   <div>
@@ -1643,7 +1774,7 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
                 <div className="h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
-                      data={activeAnalytics?.weeklyTrend || []}
+                      data={enrichedWeeklyTrend}
                       margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                     >
                       <defs>
@@ -1690,7 +1821,64 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
                 </div>
               </div>
 
-              {/* 3. Weight Logging Card */}
+              {/* 3. ALL-TIME STRENGTH & PR VELOCITY BOARD */}
+              <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
+                <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                      <Flame size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        All-Time Strength & PR Records
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
+                        Calculated peak 1-Rep Max via Epley formula ($w \times (1 + r/30)$)
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
+                    {personalRecords.length} Active Records
+                  </span>
+                </div>
+
+                {personalRecords.length === 0 ? (
+                  <div className="p-6 text-center text-slate-500 dark:text-zinc-500 text-xs bg-slate-50 dark:bg-white/[0.02] rounded-2xl border border-slate-200 dark:border-white/[0.04]">
+                    No PR records recorded yet. Complete workout sets in the Exercise Tracker to generate peak 1RM benchmarks.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    {personalRecords.map((pr, idx) => (
+                      <div
+                        key={idx}
+                        className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 dark:bg-white/[0.02] dark:border-white/[0.05] flex items-center justify-between hover:border-amber-500/40 transition"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block mb-1">
+                            Personal Best
+                          </span>
+                          <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                            {pr.name}
+                          </h4>
+                          <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono mt-0.5">
+                            {pr.weight} kg × {pr.reps} reps
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] text-slate-400 dark:text-zinc-500 block uppercase font-mono">
+                            Est. 1RM
+                          </span>
+                          <span className="text-base font-extrabold text-amber-500 font-mono">
+                            {pr.oneRepMax} <span className="text-[10px] font-normal text-slate-400">kg</span>
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Weight Logging Card */}
               <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                   <div>
@@ -1722,7 +1910,7 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
                 </div>
               </div>
 
-              {/* 4. Body Circumference Delta Tracker */}
+              {/* 5. Body Circumference Delta Tracker */}
               <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm dark:bg-[#101015]/80 dark:border-white/[0.08] dark:shadow-none backdrop-blur-2xl transition-colors">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                   <div>
@@ -1772,50 +1960,20 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
           )}
         </main>
 
-      <ActiveWorkoutModal
-            isOpen={isActiveWorkoutOpen}
-            onClose={() => setIsActiveWorkoutOpen(false)}
-            userId={data?.user?._id || data?.user?.id}
-            workoutData={todayWorkout}
-            dayName={currentDay}
-            onSessionComplete={() => {
-   
-                if (typeof fetchDashboardAndLogs === "function") {
-                  fetchDashboardAndLogs();
-                }
-                window.location.reload();
-              }}
-            onExerciseCompleted={async (exerciseName, isDone) => {
-              const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-              const userId = data?.user?._id || data?.user?.id || storedUser.id || storedUser._id;
-              const totalExercises = todayWorkout?.exercises?.length || 4;
+       
 
-              // Correctly check subdocument objects or strings
-              const isAlreadyCompleted = dailyLog?.completedExercises?.some(
-                (item) => (typeof item === "string" ? item === exerciseName : item?.name === exerciseName)
-              );
-
-              if ((isDone && !isAlreadyCompleted) || (!isDone && isAlreadyCompleted)) {
-                try {
-                  const res = await fetch("http://localhost:5000/api/log/toggle-exercise", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ userId, exerciseName, totalExercises }),
-                  });
-                  const result = await res.json();
-                  if (result.success) {
-                    setDailyLog(result.log);
-
-                    const analyticsRes = await fetch(`http://localhost:5000/api/log/analytics/${userId}`);
-                    const analyticsData = await analyticsRes.json();
-                    if (analyticsData.success) setAnalytics(analyticsData);
-                  }
-                } catch (err) {
-                  console.error("Failed to sync exercise completion:", err);
-                }
-              }
-            }}
-          />
+<ActiveWorkoutModal
+  isOpen={isActiveWorkoutOpen}
+  onClose={() => setIsActiveWorkoutOpen(false)}
+  workoutData={todayWorkout}
+  dayName={currentDay}
+  userId={data?.user?._id || data?.user?.id}
+  activePhase={activePhase}
+  personalRecords={personalRecords || []}
+  recentWeights={recentWeights || {}}
+  onSessionComplete={fetchDashboardAndLogs}
+  onExerciseCompleted={() => {}}
+/>
 
         <GroceryModal
           isOpen={isGroceryOpen}
@@ -1836,13 +1994,12 @@ const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx,
         />
 
         <BodyMeasurementModal
-            isOpen={isMeasurementOpen}
-            onClose={() => setIsMeasurementOpen(false)}
-            userId={user?._id || user?.id}
-            initialValues={dailyLog?.measurements || {}}
-            onSaved={fetchDashboardAndLogs}
-          />
-          
+          isOpen={isMeasurementOpen}
+          onClose={() => setIsMeasurementOpen(false)}
+          userId={user?._id || user?.id}
+          initialValues={dailyLog?.measurements || {}}
+          onSaved={fetchDashboardAndLogs}
+        />
       </div>
     </div>
   );

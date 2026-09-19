@@ -1,7 +1,8 @@
 import express from "express";
-import { saveWorkoutSession } from "../controllers/sessionControllers.js";
+import { saveWorkoutSession,getRecentWeights } from "../controllers/sessionControllers.js";
 
 const router = express.Router();
 router.post("/save", saveWorkoutSession);
+router.get("/recent-weights/:userId", getRecentWeights);
 
 export default router;

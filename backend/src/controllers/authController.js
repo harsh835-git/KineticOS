@@ -131,6 +131,7 @@ export const userLogin = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role || "user", // <--- Added role field here
         isOnboarded: Boolean(user.isOnboarded),
       },
     });
@@ -314,6 +315,7 @@ export const googleAuth = async (req, res) => {
       user = await User.create({
         name,
         email,
+        role: "user",
         isOnboarded: false,
       });
       isNewUser = true;
@@ -336,6 +338,7 @@ export const googleAuth = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role || "user", // <-- Added role here
         isOnboarded: Boolean(user.isOnboarded),
       },
     });

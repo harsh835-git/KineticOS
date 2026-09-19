@@ -1,7 +1,7 @@
 import React from "react";
-import { Milestone, CheckCircle2, Clock, ShieldAlert } from "lucide-react";
+import { Milestone, CheckCircle2, Clock, ShieldAlert, ArrowUpRight } from "lucide-react";
 
-const MultiWeekRoadmap = ({ roadmap }) => {
+const MultiWeekRoadmap = ({ roadmap, onOpenMeasurement }) => {
   if (!roadmap) return null;
 
   return (
@@ -25,6 +25,7 @@ const MultiWeekRoadmap = ({ roadmap }) => {
         {roadmap.phases?.map((phase, idx) => {
           const isActive = phase.status === "in-progress";
           const isDone = phase.status === "completed";
+          const isWeek3Milestone = isActive && roadmap.currentWeek === 3;
 
           return (
             <div
@@ -63,16 +64,32 @@ const MultiWeekRoadmap = ({ roadmap }) => {
                 </p>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-white/[0.05] space-y-1.5">
+              <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-white/[0.05] space-y-2">
                 <div className="flex justify-between text-[11px]">
                   <span className="text-slate-400 font-medium">Load Target:</span>
                   <span className="font-mono font-semibold text-slate-700 dark:text-zinc-200">
                     {phase.targetMetric}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-amber-500/90 font-medium">
-                  <ShieldAlert size={12} />
-                  <span>{phase.milestoneMarker}</span>
+
+                {/* Milestone Row */}
+                <div className="flex items-center justify-between gap-1.5 pt-1">
+                  <div className="flex items-center gap-1.5 text-[10px] text-amber-500/90 font-medium">
+                    <ShieldAlert size={12} className="shrink-0" />
+                    <span className="truncate">{phase.milestoneMarker}</span>
+                  </div>
+
+                  {/* Interactive Button for Week 3 Check-In */}
+                  {isWeek3Milestone && onOpenMeasurement && (
+                    <button
+                      type="button"
+                      onClick={onOpenMeasurement}
+                      className="px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition shrink-0"
+                    >
+                      <span>Log Now</span>
+                      <ArrowUpRight size={10} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
