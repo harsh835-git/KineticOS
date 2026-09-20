@@ -1,5 +1,5 @@
 import Roadmap from "../models/roadMap.js";
-import User from "../models/User.js"; // Adjust path if your User model is elsewhere
+import User from "../models/user.js"; // Adjust path if your User model is elsewhere
 import DailyLog from "../models/dailyLog.js";
 
 export const roadmapTemplates = {
