@@ -152,10 +152,10 @@ export const getUserDetails = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found." });
     }
 
-    // Run lookups in parallel for better performance
+    // Lookup plan by userId directly (do not filter by isActive)
     const [activePlan, activeDiet] = await Promise.all([
-      WorkoutPlan.findOne({ userId: id, isActive: true }),
-      DietPlan.findOne({ userId: id, isActive: true }),
+      WorkoutPlan.findOne({ userId: id }),
+      DietPlan.findOne({ userId: id }),
     ]);
 
     return res.status(200).json({
@@ -169,7 +169,6 @@ export const getUserDetails = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error fetching user details." });
   }
 };
-
 
 
 // Example in adminController.js
@@ -425,42 +424,51 @@ export const assignTemplateToUser = async (req, res) => {
       return res.status(404).json({ success: false, message: "Workout template not found." });
     }
 
-    // 1. Resolve goal
+    // 1. Resolve schema-required fields
     const resolvedGoal =
       template.targetGoal ||
       template.goal ||
       user.profile?.primaryGoal ||
-      "Fitness Routine";
+      "Muscle Gain";
 
-    // 2. Resolve activityLevel (required by schema)
+    const resolvedExperience =
+      template.experienceLevel ||
+      user.profile?.experienceLevel ||
+      "beginner";
+
     const resolvedActivityLevel =
-      user.profile?.activityLevel ||
       template.activityLevel ||
+      user.profile?.activityLevel ||
       "moderate";
 
-    // 3. Guarantee dayName is present on all schedule items
+    // 2. Explicitly map and preserve nested exercises array
     const defaultDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     const formattedSchedule = (template.schedule || []).map((item, index) => {
       const plainItem = item.toObject ? item.toObject() : { ...item };
       return {
-        ...plainItem,
         dayName: plainItem.dayName || plainItem.day || defaultDays[index % 7],
+        focus: plainItem.focus || "Full Body",
+        isRestDay: Boolean(plainItem.isRestDay),
+        exercises: (plainItem.exercises || []).map((ex) => ({
+          name: ex.name,
+          sets: Number(ex.sets) || 3,
+          reps: String(ex.reps || "8-10"),
+          restSeconds: Number(ex.restSeconds) || 60,
+          formGuidance: ex.formGuidance || "",
+        })),
       };
     });
 
     const planData = {
       userId,
-      title: template.title || "Custom Assigned Routine",
       goal: resolvedGoal,
-      targetGoal: resolvedGoal,
+      experienceLevel: resolvedExperience,
       activityLevel: resolvedActivityLevel,
-      experienceLevel: template.experienceLevel || user.profile?.experienceLevel || "beginner",
+      weekNumber: 1,
       schedule: formattedSchedule,
-      isActive: true,
-      assignedByAdmin: true,
     };
 
-    // 4. UPSERT: Update existing plan or insert if it doesn't exist (avoids E11000)
+    // 3. Upsert using strict matching on userId
     const activePlan = await WorkoutPlan.findOneAndUpdate(
       { userId },
       { $set: planData },

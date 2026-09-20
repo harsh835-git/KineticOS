@@ -75,20 +75,29 @@ const AdminDashboard = () => {
   };
 
   const fetchTemplates = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/admin/templates", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      const list = data.templates || (Array.isArray(data) ? data : []);
-      setTemplates(list);
-    } catch (err) {
-      console.error("Failed to load workout templates:", err);
-      setTemplates([]);
-    }
-  };
+  try {
+    const token = localStorage.getItem("token");
+    const res = await fetch("http://localhost:5000/api/admin/templates", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    const list = data.templates || (Array.isArray(data) ? data : []);
 
+    // 🔍 ADD THIS LOG:
+    console.log("Fetched Admin Workout Templates:", list);
+    list.forEach((t) => {
+      console.log(`Template: "${t.title}" (${t._id})`);
+      t.schedule?.forEach((day) => {
+        console.log(`  -> ${day.dayName}: ${day.focus} | Exercises:`, day.exercises?.length || 0);
+      });
+    });
+
+    setTemplates(list);
+  } catch (err) {
+    console.error("Failed to load workout templates:", err);
+    setTemplates([]);
+  }
+};
   const fetchDietTemplates = async () => {
     try {
       const token = localStorage.getItem("token");

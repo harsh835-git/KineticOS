@@ -141,9 +141,48 @@ const Dashboard = () => {
         fetch(`http://localhost:5000/api/log/analytics/${userId}`),
       ]);
 
-      const dashData = await dashRes.json();
+      let dashData = await dashRes.json();
       const logData = await logRes.json();
       const aData = await analyticsRes.json();
+
+      // ===============================================================
+      // 🛠️ AUTO-HEAL: Detect if workout plan is missing or all days have 0 exercises
+      // ===============================================================
+      const currentPlan = dashData?.weeklyWorkoutPlan || dashData?.workoutPlan || dashData?.plan;
+      const isRoutineEmpty =
+        !currentPlan ||
+        !currentPlan.schedule ||
+        currentPlan.schedule.length === 0 ||
+        currentPlan.schedule.every((day) => !day.exercises || day.exercises.length === 0);
+
+      if (isRoutineEmpty) {
+        console.log("Empty or unpopulated workout routine detected. Auto-generating full routine...");
+        const genRes = await fetch("http://localhost:5000/api/workout/generate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({ userId }),
+        });
+
+        const genData = await genRes.json();
+        if (genData.success && genData.workoutPlan) {
+          // Update dashData with the newly generated routine
+          dashData.workoutPlan = genData.workoutPlan;
+          dashData.weeklyWorkoutPlan = genData.workoutPlan;
+
+          // Also update todayWorkout if today's day matches
+          const currentDayName = dashData.currentDay || "Monday";
+          const todayScheduleItem = genData.workoutPlan.schedule?.find(
+            (d) => d.dayName?.toLowerCase() === currentDayName.toLowerCase()
+          );
+          if (todayScheduleItem) {
+            dashData.todayWorkout = todayScheduleItem;
+          }
+        }
+      }
+      // ===============================================================
 
       if (dashRes.ok) setData(dashData);
       if (logData.success) setDailyLog(logData.log);
@@ -158,26 +197,27 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
-  const fetchRecentWeights = async (uid) => {
-  if (!uid) return;
-  try {
-    const res = await fetch(`http://localhost:5000/api/session/recent-weights/${uid}`);
-    const data = await res.json();
-    if (data.success) {
-      setRecentWeights(data.weights || {});
-    }
-  } catch (err) {
-    console.error("Could not fetch recent weights:", err);
-  }
-};
 
-useEffect(() => {
-  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const uid = data?.user?._id || data?.user?.id || storedUser.id || storedUser._id;
-  if (uid) {
-    fetchRecentWeights(uid);
-  }
-}, [data?.user]);
+  const fetchRecentWeights = async (uid) => {
+    if (!uid) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/session/recent-weights/${uid}`);
+      const data = await res.json();
+      if (data.success) {
+        setRecentWeights(data.weights || {});
+      }
+    } catch (err) {
+      console.error("Could not fetch recent weights:", err);
+    }
+  };
+
+  useEffect(() => {
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const uid = data?.user?._id || data?.user?.id || storedUser.id || storedUser._id;
+    if (uid) {
+      fetchRecentWeights(uid);
+    }
+  }, [data?.user]);
 
   const fetchRoadmapData = async (userId) => {
     try {
@@ -556,8 +596,12 @@ useEffect(() => {
     );
   }
 
-  const { user, todayWorkout, todayDiet, currentDay, weeklyWorkoutPlan, weeklyDietPlan } = data;
-  const profile = user.profile || {};
+  // Resilient destructuring to resolve any schema variation from the backend
+  const { user, todayWorkout, todayDiet, currentDay } = data || {};
+  const weeklyWorkoutPlan = data?.weeklyWorkoutPlan || data?.workoutPlan || data?.plan || null;
+  const weeklyDietPlan = data?.weeklyDietPlan || data?.dietPlan || null;
+
+  const profile = user?.profile || {};
   const isVeg = profile.dietaryPreference === "vegetarian";
 
   const navigationItems = [
@@ -631,24 +675,19 @@ useEffect(() => {
     return { ...item, tonnage: item.tonnage || 0 };
   });
 
- const handleExportFullDailyPDF = () => {
-    // 1. Safely find the daily log data across common state variable names
+  const handleExportFullDailyPDF = () => {
     const resolvedDailyLog =
       (typeof todayDailyLog !== "undefined" && todayDailyLog) ||
       (typeof dailyLog !== "undefined" && dailyLog) ||
       (typeof logData !== "undefined" && logData) ||
       data?.dailyLog ||
-      dashboardData?.dailyLog ||
       {};
 
-    // 2. Safely find user info
     const resolvedUser =
       (typeof user !== "undefined" && user) ||
       data?.user ||
-      dashboardData?.user ||
       JSON.parse(localStorage.getItem("user") || "{}");
 
-    // 3. Safely calculate completed sets & tonnage
     const completedSets = resolvedDailyLog?.completedExercises || [];
     const totalTonnage = completedSets.reduce(
       (sum, s) =>
@@ -662,15 +701,11 @@ useEffect(() => {
       completedSets.map((e) => (e.exerciseName || e.name || "").toLowerCase())
     ).size;
 
-    // 4. Safely locate today's planned exercises
     const currentExercises =
       (typeof todayWorkout !== "undefined" && todayWorkout?.exercises) ||
-      (typeof currentWorkout !== "undefined" && currentWorkout?.exercises) ||
-      workoutData?.exercises ||
       data?.todayWorkout?.exercises ||
       [];
 
-    // 5. Generate and download PDF
     generateFullLifestylePDF({
       user: resolvedUser,
       dailyLog: resolvedDailyLog,
@@ -834,14 +869,14 @@ useEffect(() => {
           <div className={`flex items-center gap-2.5 ${sidebarOpen ? "w-full px-1" : "justify-center"}`}>
             <div
               className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-600 to-violet-800 flex items-center justify-center text-white text-xs font-bold border border-violet-400/30 shrink-0"
-              title={`${user.name} (${user.email})`}
+              title={`${user?.name} (${user?.email})`}
             >
-              {user.name?.charAt(0)?.toUpperCase() || "H"}
+              {user?.name?.charAt(0)?.toUpperCase() || "H"}
             </div>
             {sidebarOpen && (
               <div className="overflow-hidden">
-                <p className="text-xs font-semibold text-slate-900 dark:text-white truncate max-w-[140px]">{user.name}</p>
-                <p className="text-[10px] text-slate-500 dark:text-zinc-500 truncate max-w-[140px]">{user.email}</p>
+                <p className="text-xs font-semibold text-slate-900 dark:text-white truncate max-w-[140px]">{user?.name}</p>
+                <p className="text-[10px] text-slate-500 dark:text-zinc-500 truncate max-w-[140px]">{user?.email}</p>
               </div>
             )}
           </div>
@@ -1071,7 +1106,7 @@ useEffect(() => {
 
           <div className="flex items-center gap-2 text-xs">
             <span className="hidden sm:inline-block text-[11px] text-slate-500 dark:text-zinc-400 mr-2">
-              Welcome back, <strong className="text-slate-900 dark:text-zinc-200">{user.name}</strong>
+              Welcome back, <strong className="text-slate-900 dark:text-zinc-200">{user?.name}</strong>
             </span>
             <span className="px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-700 dark:text-violet-300 font-semibold text-[11px]">
               {profile.primaryGoal}
@@ -1085,14 +1120,14 @@ useEffect(() => {
             >
               {profile.dietaryPreference || "Non-Veg"}
             </span>
-<button
-  type="button"
-  onClick={handleExportFullDailyPDF}
-  className="px-3.5 py-1.5 rounded-full bg-violet-100 hover:bg-violet-200 dark:bg-violet-950/40 dark:hover:bg-violet-900/50 border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
->
-  <FileText size={14} className="text-violet-600 dark:text-violet-400" />
-  <span>Export Full Daily Report (PDF)</span>
-</button>
+            <button
+              type="button"
+              onClick={handleExportFullDailyPDF}
+              className="px-3.5 py-1.5 rounded-full bg-violet-100 hover:bg-violet-200 dark:bg-violet-950/40 dark:hover:bg-violet-900/50 border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <FileText size={14} className="text-violet-600 dark:text-violet-400" />
+              <span>Export Full Daily Report (PDF)</span>
+            </button>
 
             {/* Theme Toggle Button */}
             <button
@@ -1195,12 +1230,12 @@ useEffect(() => {
           </div>
 
           {/* --- Multi-Week Roadmap Component --- */}
-            <div className="mb-6">
-              <MultiWeekRoadmap 
-                roadmap={roadmapData} 
-                onOpenMeasurement={() => setIsMeasurementOpen(true)} 
-              />
-            </div>
+          <div className="mb-6">
+            <MultiWeekRoadmap 
+              roadmap={roadmapData} 
+              onOpenMeasurement={() => setIsMeasurementOpen(true)} 
+            />
+          </div>
 
           <div className="mt-6">
             <ExerciseTracker userId={user?._id || user?.id} />
@@ -1484,9 +1519,11 @@ useEffect(() => {
             const isExhausted = currentEnergy === "Exhausted" || currentEnergy === "Very Tired";
             const isFatigued = currentEnergy === "Fatigued" || currentEnergy === "Slightly Fatigued";
 
+            // Safe fallback chain for scheduleList across all naming conventions
             const scheduleList =
               weeklyWorkoutPlan?.schedule ||
               data?.workoutPlan?.schedule ||
+              data?.plan?.schedule ||
               data?.schedule ||
               [];
 
@@ -1495,7 +1532,7 @@ useEffect(() => {
                 <div className="mb-6">
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white">7-Day Progressive Workout Routine</h2>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-                    Tailored for {profile?.primaryGoal || "Muscle Gain"} ({profile?.experienceLevel || "beginner"} level).
+                    Tailored for {profile?.primaryGoal || weeklyWorkoutPlan?.goal || "Muscle Gain"} ({profile?.experienceLevel || weeklyWorkoutPlan?.experienceLevel || "beginner"} level).
                   </p>
                 </div>
 
@@ -1506,7 +1543,7 @@ useEffect(() => {
 
                     return (
                       <div
-                        key={day.dayName}
+                        key={day._id || day.dayName}
                         className={`p-5 rounded-2xl border transition ${
                           isToday
                             ? "bg-violet-50 border-violet-300 shadow-md shadow-violet-100 dark:bg-violet-950/20 dark:border-violet-500/50 dark:shadow-violet-900/20"
@@ -1544,10 +1581,10 @@ useEffect(() => {
 
                               return (
                                 <div
-                                  key={idx}
+                                  key={e._id || idx}
                                   className="p-3 rounded-xl bg-slate-50 border border-slate-200 dark:bg-white/[0.02] dark:border-white/[0.04] flex items-center gap-3"
                                 >
-                                  <div className="w-6 h-6 rounded-lg bg-slate-200 dark:zinc-800/80 flex items-center justify-center text-xs font-bold text-violet-600 dark:text-violet-400 shrink-0">
+                                  <div className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-zinc-800/80 flex items-center justify-center text-xs font-bold text-violet-600 dark:text-violet-400 shrink-0">
                                     {idx + 1}
                                   </div>
                                   <div className="min-w-0">
@@ -1963,20 +2000,18 @@ useEffect(() => {
           )}
         </main>
 
-       
-
-<ActiveWorkoutModal
-  isOpen={isActiveWorkoutOpen}
-  onClose={() => setIsActiveWorkoutOpen(false)}
-  workoutData={todayWorkout}
-  dayName={currentDay}
-  userId={data?.user?._id || data?.user?.id}
-  activePhase={activePhase}
-  personalRecords={personalRecords || []}
-  recentWeights={recentWeights || {}}
-  onSessionComplete={fetchDashboardAndLogs}
-  onExerciseCompleted={() => {}}
-/>
+        <ActiveWorkoutModal
+          isOpen={isActiveWorkoutOpen}
+          onClose={() => setIsActiveWorkoutOpen(false)}
+          workoutData={todayWorkout}
+          dayName={currentDay}
+          userId={data?.user?._id || data?.user?.id}
+          activePhase={activePhase}
+          personalRecords={personalRecords || []}
+          recentWeights={recentWeights || {}}
+          onSessionComplete={fetchDashboardAndLogs}
+          onExerciseCompleted={() => {}}
+        />
 
         <GroceryModal
           isOpen={isGroceryOpen}

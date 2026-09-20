@@ -1,5 +1,6 @@
 import DailyLog from "../models/dailyLog.js";
 import WorkoutPlan from "../models/workoutPlan.js";
+import mongoose from "mongoose";
 
 // Helper: Standardized Local YYYY-MM-DD (Matches logController & sessionController)
 const getTodayDateString = () => {
@@ -72,8 +73,7 @@ export const logExerciseSet = async (req, res) => {
     const log = await DailyLog.findOneAndUpdate(
       { userId, dateString },
       {
-        $push: { completedExercises: setPayload },
-        $set: { workoutStatus: "In Progress" }
+        $push: { completedExercises: setPayload },$set: { workoutStatus: "In Progress" }
       },
       { returnDocument: "after", upsert: true }
     );
@@ -112,19 +112,48 @@ export const applyIntervention = async (req, res) => {
   try {
     const { userId, interventionType } = req.body;
 
-    if (!userId || !interventionType) {
-      return res.status(400).json({ success: false, message: "Missing required parameters." });
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required." });
     }
 
+    const typeKey = (interventionType || "MOMENTUM_RESTORE").toUpperCase();
     const todayDate = getTodayDateString();
     const currentDayName = getTodayDayName();
 
-    const workoutPlan = await WorkoutPlan.findOne({ userId });
+    const targetQuery = {
+      $or: [
+        { userId },
+        ...(mongoose.Types.ObjectId.isValid(userId)
+          ? [{ userId: new mongoose.Types.ObjectId(userId) }]
+          : [])
+      ]
+    };
+
+    const workoutPlan = await WorkoutPlan.findOne(targetQuery);
+
+    // If user does not have a workout plan yet, protect their streak in DailyLog without throwing a 404
     if (!workoutPlan || !workoutPlan.schedule || workoutPlan.schedule.length === 0) {
-      return res.status(404).json({ success: false, message: "Workout plan not found." });
+      const log = await DailyLog.findOneAndUpdate(
+        { userId, dateString: todayDate },
+        { 
+          $set: { 
+            notes: `Emergency Streak Freeze Active (${typeKey})`,
+            habitScore: 50,
+            workoutStatus: "Rest Day"
+          } 
+        },
+        { returnDocument: "after", upsert: true }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Streak protected! Rest & recovery registered for today.",
+        hasActivePlan: false,
+        dailyLog: log
+      });
     }
 
-    // Case-insensitive lookup with fallback to day 0
+    // Identify active day index
     let todayDayIndex = workoutPlan.schedule.findIndex(
       (d) => d.dayName && d.dayName.toLowerCase() === currentDayName.toLowerCase()
     );
@@ -133,34 +162,33 @@ export const applyIntervention = async (req, res) => {
       todayDayIndex = 0;
     }
 
-    let modifiedSchedule = [...workoutPlan.schedule];
-    let interventionMessage = "";
+    let modifiedSchedule = workoutPlan.schedule.map((day) =>
+      typeof day.toObject === "function" ? day.toObject() : { ...day }
+    );
+    let interventionMessage = "Streak Freeze & workload scale-down applied.";
 
-    if (interventionType === "MOMENTUM_RESTORE") {
+    if (typeKey === "MOMENTUM_RESTORE" || typeKey === "STREAK_FREEZE" || typeKey === "STREAK-FREEZE") {
       const baseExercises = modifiedSchedule[todayDayIndex].exercises || [];
       const trimmedExercises = baseExercises.slice(0, 2).map((ex) => ({
         ...ex,
-        sets: Math.min(ex.sets || 3, 2),
+        sets: Math.min(Number(ex.sets) || 3, 2),
         notes: "Quick momentum session: Focused effort, controlled tempo."
       }));
 
       modifiedSchedule[todayDayIndex].exercises = trimmedExercises;
-      modifiedSchedule[todayDayIndex].sessionTitle = `Quick Readiness: ${modifiedSchedule[todayDayIndex].sessionTitle || "Compound Lifts"}`;
+      modifiedSchedule[todayDayIndex].focus = `Quick Readiness: ${modifiedSchedule[todayDayIndex].focus || "Core Lifts"}`;
       interventionMessage = "Workout trimmed to a 15-minute quick-readiness session.";
-    } 
-    else if (interventionType === "FATIGUE_DELOAD") {
+    } else if (typeKey === "FATIGUE_DELOAD" || typeKey === "DELOAD") {
       modifiedSchedule = modifiedSchedule.map((day) => ({
         ...day,
         exercises: (day.exercises || []).map((ex) => ({
           ...ex,
-          sets: Math.max(1, Math.round((ex.sets || 3) * 0.6)),
-          targetRpe: Math.min(ex.targetRpe || 8, 6.5),
+          sets: Math.max(1, Math.round((Number(ex.sets) || 3) * 0.6)),
           notes: "Active Deload: 40% volume reduction to reset CNS."
         }))
       }));
       interventionMessage = "Deload applied: 40% volume taper activated.";
-    } 
-    else if (interventionType === "SCHEDULE_COMPRESSION") {
+    } else if (typeKey === "SCHEDULE_COMPRESSION") {
       const allowedDays = ["Monday", "Wednesday", "Friday"];
       modifiedSchedule = modifiedSchedule.map((day) => {
         if (!allowedDays.includes(day.dayName)) {
@@ -172,11 +200,12 @@ export const applyIntervention = async (req, res) => {
     }
 
     workoutPlan.schedule = modifiedSchedule;
+    workoutPlan.markModified("schedule");
     await workoutPlan.save();
 
     await DailyLog.findOneAndUpdate(
       { userId, dateString: todayDate },
-      { $set: { notes: `Intervention active: ${interventionType}` } },
+      { $set: { notes: `Intervention active: ${typeKey}` } },
       { returnDocument: "after", upsert: true }
     );
 

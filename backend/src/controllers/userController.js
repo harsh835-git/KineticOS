@@ -1,4 +1,4 @@
-import User from "../models/User.js";
+import User from "../models/user.js";
 import WorkoutPlan from "../models/workoutPlan.js";
 import DietPlan from "../models/dietPlan.js";
 import Roadmap from "../models/roadMap.js";
@@ -214,24 +214,33 @@ export const getDashboardOverview = async (req, res) => {
     const workoutPlan = await WorkoutPlan.findOne({ userId });
     const dietPlan = await DietPlan.findOne({ userId });
 
-    // Extract today's specific workout and meals
+    // Case-insensitive matching for today's workout and meals
     const todayWorkout =
-      workoutPlan?.schedule?.find((day) => day.dayName === currentDayName) || null;
+      workoutPlan?.schedule?.find(
+        (day) => day.dayName?.trim().toLowerCase() === currentDayName.toLowerCase()
+      ) || null;
+
     const todayDiet =
-      dietPlan?.schedule?.find((day) => day.dayName === currentDayName) || null;
+      dietPlan?.schedule?.find(
+        (day) => day.dayName?.trim().toLowerCase() === currentDayName.toLowerCase()
+      ) || null;
 
     return res.status(200).json({
       success: true,
       currentDay: currentDayName,
       user: {
         id: user._id,
+        _id: user._id,
         name: user.name,
         email: user.email,
         profile: user.profile,
       },
       todayWorkout,
       todayDiet,
+      // Provide both key variants to ensure frontend compatibility
+      workoutPlan,
       weeklyWorkoutPlan: workoutPlan,
+      dietPlan,
       weeklyDietPlan: dietPlan,
     });
   } catch (error) {

@@ -1,5 +1,6 @@
 import WorkoutPlan from "../models/workoutPlan.js";
-import User from "../models/User.js";
+import User from "../models/user.js";
+import mongoose from "mongoose";
 // Helper to construct routines across all 5 FitAI goals
 const buildWeeklyRoutine = (goal, experience) => {
   const isBeginner = experience === "beginner";
@@ -356,35 +357,64 @@ const buildWeeklyRoutine = (goal, experience) => {
   }
 };
 
-// POST /api/workout/generate
 export const generateWorkoutPlan = async (req, res) => {
   try {
     const { userId } = req.body;
 
-    const user = await User.findById(userId);
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "userId is required." });
+    }
+
+    // Resolve user by ObjectId or String ID
+    const queryId = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : userId;
+
+    const user = await User.findById(queryId);
     if (!user || !user.profile) {
-      return res.status(404).json({ success: false, message: "User profile not found. Complete onboarding first." });
+      return res.status(404).json({
+        success: false,
+        message: "User profile not found. Complete onboarding first.",
+      });
     }
 
     const { primaryGoal, experienceLevel, activityLevel } = user.profile;
 
+    // Generate schedule based on goal and experience
     const weeklySchedule = buildWeeklyRoutine(
       primaryGoal || "Weight Loss",
       experienceLevel || "beginner"
     );
 
-    // Upsert workout plan for user
+    // Explicitly deep clone schedule with mapped exercise objects to prevent dropped keys
+    const sanitizedSchedule = weeklySchedule.map((day) => ({
+      dayName: day.dayName,
+      focus: day.focus,
+      isRestDay: Boolean(day.isRestDay),
+      exercises: (day.exercises || []).map((ex) => ({
+        name: ex.name,
+        sets: Number(ex.sets) || 3,
+        reps: String(ex.reps || "8-10"),
+        restSeconds: Number(ex.restSeconds) || 60,
+        formGuidance: ex.formGuidance || "",
+      })),
+    }));
+
+    // Upsert using $set with both ObjectId and raw string query support
+    const targetUserId = user._id || queryId;
     const workoutPlan = await WorkoutPlan.findOneAndUpdate(
-      { userId: user._id },
+      { userId: targetUserId },
       {
-        userId: user._id,
-        goal: primaryGoal || "Weight Loss",
-        experienceLevel: experienceLevel || "beginner",
-        activityLevel: activityLevel || "moderate",
-        schedule: weeklySchedule,
-        weekNumber: 1,
+        $set: {
+          userId: targetUserId,
+          goal: primaryGoal || "Weight Loss",
+          experienceLevel: experienceLevel || "beginner",
+          activityLevel: activityLevel || "moderate",
+          schedule: sanitizedSchedule,
+          weekNumber: 1,
+        },
       },
-      { returnDocument: 'after', upsert: true }
+      { returnDocument: "after", upsert: true, runValidators: true }
     );
 
     return res.status(200).json({
@@ -394,7 +424,10 @@ export const generateWorkoutPlan = async (req, res) => {
     });
   } catch (error) {
     console.error("Generate Workout Error:", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to generate workout plan." });
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to generate workout plan.",
+    });
   }
 };
 
@@ -402,15 +435,35 @@ export const generateWorkoutPlan = async (req, res) => {
 export const getWorkoutPlan = async (req, res) => {
   try {
     const { userId } = req.params;
-    const plan = await WorkoutPlan.findOne({ userId });
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID parameter required." });
+    }
+
+    const query = {
+      $or: [
+        { userId: userId },
+        ...(mongoose.Types.ObjectId.isValid(userId)
+          ? [{ userId: new mongoose.Types.ObjectId(userId) }]
+          : []),
+      ],
+    };
+
+    const plan = await WorkoutPlan.findOne(query);
 
     if (!plan) {
-      return res.status(404).json({ success: false, message: "No workout plan found for this user." });
+      return res.status(404).json({
+        success: false,
+        message: "No workout plan found for this user.",
+      });
     }
 
     return res.status(200).json({ success: true, workoutPlan: plan });
   } catch (error) {
     console.error("Get Workout Error:", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to retrieve workout plan." });
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to retrieve workout plan.",
+    });
   }
 };
