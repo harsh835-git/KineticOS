@@ -23,25 +23,34 @@ dotenv.config();
 
 const app = express();
 
-// Support both local dev and production client domains
+// Normalize origins and support both local dev and production client domains
 const allowedOrigins = [
   "http://localhost:5173",
-  process.env.CLIENT_URL, // e.g. https://kinetecos.vercel.app
+  "https://kinetic-os-ten.vercel.app",
+  process.env.CLIENT_URL ? process.env.CLIENT_URL.replace(/\/$/, "") : null,
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like curl, mobile, or health checks)
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests with no origin (like curl, mobile, or server health checks)
+      if (!origin) return callback(null, true);
+
+      // Clean trailing slashes if present in the incoming origin header
+      const formattedOrigin = origin.replace(/\/$/, "");
+
+      if (allowedOrigins.includes(formattedOrigin)) {
         return callback(null, true);
       }
-      return callback(new Error("CORS policy violation"));
+
+      // Pass null, false instead of throwing a raw Error to prevent server crashes
+      return callback(null, false);
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
 app.use(express.json());
 
 // API Routes
