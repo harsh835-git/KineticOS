@@ -17,6 +17,8 @@ import { Link, useNavigate } from "react-router-dom";
 import ForgotPasswordModal from "../components/publicModals/ForgotPasswordModal";
 import { useGoogleLogin } from "@react-oauth/google";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://kinetecos-api.onrender.com";
+
 const Login = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -53,7 +55,7 @@ const Login = () => {
     e.preventDefault();
 
     try {
-      const response = await fetch("http://localhost:5000/api/auth/login", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -89,7 +91,7 @@ const Login = () => {
       setForgotMessage("");
 
       const response = await fetch(
-        "http://localhost:5000/api/auth/forgot-password",
+        `${API_BASE_URL}/api/auth/forgot-password`,
         {
           method: "POST",
           headers: {
@@ -120,7 +122,7 @@ const Login = () => {
         },
       ).then((res) => res.json());
 
-      const res = await fetch("http://localhost:5000/api/auth/google", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

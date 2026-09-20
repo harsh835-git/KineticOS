@@ -19,6 +19,8 @@ import {
   Zap,
 } from "lucide-react";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://kinetecos-api.onrender.com";
+
 const Register = () => {
   const navigate = useNavigate();
 
@@ -31,7 +33,7 @@ const Register = () => {
     password: "",
   });
 
-  // UI Status States (Fixed: added missing states)
+  // UI Status States
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,7 +52,7 @@ const Register = () => {
         }
       ).then((res) => res.json());
 
-      const res = await fetch("http://localhost:5000/api/auth/google", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -68,9 +70,9 @@ const Register = () => {
         return;
       }
       if (!data.isNewUser) {
-       setError("This Google email is already registered. Please login instead.");
-       setLoading(false);
-         return; // Stops here, doesn't redirect
+        setError("This Google email is already registered. Please login instead.");
+        setLoading(false);
+        return;
       }
 
       localStorage.setItem("token", data.token);
@@ -78,7 +80,6 @@ const Register = () => {
 
       setMessage(data.message || "Signed in successfully!");
 
-      // If user already completed onboarding, go straight to dashboard
       setTimeout(() => {
         if (data.user?.isOnboarded) {
           navigate("/dashboard");
@@ -114,7 +115,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/register", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -122,14 +123,12 @@ const Register = () => {
 
       const data = await res.json();
 
-      // If already registered (409) or bad request (400)
       if (!res.ok) {
         setError(data.message || "Email is already registered. Please log in.");
         setLoading(false);
-        return; // Halt execution so navigation doesn't trigger
+        return;
       }
 
-      // Successful registration:
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       setMessage("Account created successfully! Redirecting...");
