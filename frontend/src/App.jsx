@@ -11,7 +11,7 @@ import Contact from "./pages/ContactPage";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
-import Onboarding from "./pages/Onboarding";
+import Onboarding from "./pages/OnBoarding";
 import Dashboard from "./pages/dashboard/UserDashboard";
 import AdminDashboard from "./pages/dashboard/AdminDashBoard";
 
