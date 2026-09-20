@@ -139,9 +139,6 @@ export const updateUserRole = async (req, res) => {
   }
 };
 
-
-
-
 // @desc    Get detailed user profile and active plans (workout + nutrition)
 export const getUserDetails = async (req, res) => {
   try {
