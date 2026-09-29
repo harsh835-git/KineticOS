@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import api from "../config/Api.jsx";
 import { TrendingUp, Dumbbell, Zap, CheckCircle2, History, Award, Flame } from "lucide-react";
 
 const ExerciseTracker = ({ userId }) => {
@@ -23,8 +24,8 @@ const ExerciseTracker = ({ userId }) => {
   const fetchTodaySets = async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`import.meta.env.VITE_API_URL/api/training/today-sets/${userId}`);
-      const data = await res.json();
+      const res = await api.get(`/api/training/today-sets/${userId}`);
+    const data = res.data;
       if (data.success) {
         setLoggedSets(data.exercises || []);
       }
@@ -55,22 +56,18 @@ const ExerciseTracker = ({ userId }) => {
     const isNewPR = currentEstimated1RM > priorBest1RM && priorBest1RM > 0;
 
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/training/log-set", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          exerciseName,
-          setNumber: loggedSets.filter((s) => s.name === exerciseName).length + 1,
-          weight: Number(weight),
-          targetReps: Number(targetReps),
-          completedReps: Number(completedReps),
-          rpe: Number(rpe),
-          estimated1RM: currentEstimated1RM,
-        }),
+      const res = await api.post("/api/training/log-set", {
+        userId,
+        exerciseName,
+        setNumber: loggedSets.filter((s) => s.name === exerciseName).length + 1,
+        weight: Number(weight),
+        targetReps: Number(targetReps),
+        completedReps: Number(completedReps),
+        rpe: Number(rpe),
+        estimated1RM: currentEstimated1RM,
       });
 
-      const data = await res.json();
+const data = res.data;
       if (data.success) {
         setFeedback(data.feedback);
         setLoggedSets(data.dailyLog?.completedExercises || []);

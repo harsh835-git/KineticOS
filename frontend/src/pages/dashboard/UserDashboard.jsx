@@ -1,66 +1,128 @@
 import React, { useEffect, useState, useMemo } from "react";
+
+import api from "../../config/Api.jsx";
+
 import { useNavigate } from "react-router-dom";
+
 import {
+
   Activity,
+
   LayoutDashboard,
+
   Dumbbell,
+
   Utensils,
+
   Flame,
+
   Zap,
+
   CheckCircle2,
+
   Circle,
+
   Calendar,
+
   Clock,
+
   LogOut,
+
   Sparkles,
+
   ShieldCheck,
+
   ChevronRight,
+
   TrendingUp,
+
   Target,
+
   RefreshCw,
+
   Sliders,
+
   Droplets,
+
   Plus,
+
   Minus,
+
   Menu,
+
   X,
+
   LineChart,
+
   Scale,
+
   Award,
+
   Repeat,
+
   Check,
+
   ArrowRight,
+
   Play,
+
   ShoppingCart,
+
   ShieldAlert,
+
   HeartPulse,
+
   CalendarCheck,
+
   Sun,
+
   Moon,
+
   Ruler,
+
   FileText,
+
 } from "lucide-react";
+
 import {
+
   ResponsiveContainer,
+
   AreaChart,
+
   Area,
+
   XAxis,
+
   YAxis,
+
   Tooltip,
+
   CartesianGrid,
+
 } from "recharts";
+
 import ActiveWorkoutModal from "../../components/ActiveWorkoutModal";
+
 import GroceryModal from "../../components/publicModals/groceryModal";
+
 import DailyCheckInModal from "../../components/DailyCheckInModal";
+
 import BodyMeasurementModal from "../../components/BodyMeasurementModal";
+
 import MultiWeekRoadmap from "../../components/MultiWeekRoadmap";
+
 import ExerciseTracker from "../../components/ExerciseTracker";
+
 import RiskInterventionBanner from "../../components/RiskInterventionBanner.jsx";
+
 import { generateFullLifestylePDF } from "../../utils/fullReportPdfGenerator.js";
+
 import AnnouncementBanner from "../../components/AnnouncementBanner.jsx";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+
   const [data, setData] = useState(null);
   const [dailyLog, setDailyLog] = useState(null);
   const [analytics, setAnalytics] = useState(null);
@@ -87,6 +149,7 @@ const Dashboard = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+
   const [chatMessages, setChatMessages] = useState([
     {
       sender: "coach",
@@ -111,11 +174,13 @@ const Dashboard = () => {
 
   useEffect(() => {
     const root = document.documentElement;
+
     if (theme === "dark") {
       root.classList.add("dark");
     } else {
       root.classList.remove("dark");
     }
+
     localStorage.setItem("theme", theme);
   }, [theme]);
 
@@ -123,7 +188,8 @@ const Dashboard = () => {
     setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
-  const activePhase = roadmapData?.phases?.find((p) => p.status === "in-progress") || null;
+  const activePhase =
+    roadmapData?.phases?.find((p) => p.status === "in-progress") || null;
 
   const fetchDashboardAndLogs = async () => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
@@ -136,37 +202,49 @@ const Dashboard = () => {
 
     try {
       const [dashRes, logRes, analyticsRes] = await Promise.all([
-        fetch(`import.meta.env.VITE_API_URL/api/user/dashboard/${userId}`),
-        fetch(`import.meta.env.VITE_API_URL/api/log/today/${userId}`),
-        fetch(`import.meta.env.VITE_API_URL/api/log/analytics/${userId}`),
+        api.get(`/api/user/dashboard/${userId}`),
+        api.get(`/api/log/today/${userId}`),
+        api.get(`/api/log/analytics/${userId}`),
       ]);
 
-      let dashData = await dashRes.json();
-      const logData = await logRes.json();
-      const aData = await analyticsRes.json();
+      const dashData = dashRes.data;
+      const logData = logRes.data;
+      const aData = analyticsRes.data;
 
       // ===============================================================
       // 🛠️ AUTO-HEAL: Detect if workout plan is missing or all days have 0 exercises
       // ===============================================================
-      const currentPlan = dashData?.weeklyWorkoutPlan || dashData?.workoutPlan || dashData?.plan;
+
+      const currentPlan =
+        dashData?.weeklyWorkoutPlan ||
+        dashData?.workoutPlan ||
+        dashData?.plan;
+
       const isRoutineEmpty =
         !currentPlan ||
         !currentPlan.schedule ||
         currentPlan.schedule.length === 0 ||
-        currentPlan.schedule.every((day) => !day.exercises || day.exercises.length === 0);
+        currentPlan.schedule.every(
+          (day) => !day.exercises || day.exercises.length === 0
+        );
 
       if (isRoutineEmpty) {
-        console.log("Empty or unpopulated workout routine detected. Auto-generating full routine...");
-        const genRes = await fetch("import.meta.env.VITE_API_URL/api/workout/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({ userId }),
-        });
+        console.log(
+          "Empty or unpopulated workout routine detected. Auto-generating full routine..."
+        );
 
-        const genData = await genRes.json();
+        const genRes = await api.post(
+          "/api/workout/generate",
+          { userId },
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+
+        const genData = genRes.data;
+
         if (genData.success && genData.workoutPlan) {
           // Update dashData with the newly generated routine
           dashData.workoutPlan = genData.workoutPlan;
@@ -174,18 +252,30 @@ const Dashboard = () => {
 
           // Also update todayWorkout if today's day matches
           const currentDayName = dashData.currentDay || "Monday";
-          const todayScheduleItem = genData.workoutPlan.schedule?.find(
-            (d) => d.dayName?.toLowerCase() === currentDayName.toLowerCase()
-          );
+
+          const todayScheduleItem =
+            genData.workoutPlan.schedule?.find(
+              (d) =>
+                d.dayName?.toLowerCase() ===
+                currentDayName.toLowerCase()
+            );
+
           if (todayScheduleItem) {
             dashData.todayWorkout = todayScheduleItem;
           }
         }
       }
+
       // ===============================================================
 
-      if (dashRes.ok) setData(dashData);
-      if (logData.success) setDailyLog(logData.log);
+      if (dashRes.status >= 200 && dashRes.status < 300) {
+        setData(dashData);
+      }
+
+      if (logData.success) {
+        setDailyLog(logData.log);
+      }
+
       if (aData.success) {
         setAnalytics(aData);
         setAnalyticsData(aData);
@@ -200,9 +290,14 @@ const Dashboard = () => {
 
   const fetchRecentWeights = async (uid) => {
     if (!uid) return;
+
     try {
-      const res = await fetch(`import.meta.env.VITE_API_URL/api/session/recent-weights/${uid}`);
-      const data = await res.json();
+      const res = await api.get(
+        `/api/session/recent-weights/${uid}`
+      );
+
+      const data = res.data;
+
       if (data.success) {
         setRecentWeights(data.weights || {});
       }
@@ -213,7 +308,13 @@ const Dashboard = () => {
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-    const uid = data?.user?._id || data?.user?.id || storedUser.id || storedUser._id;
+
+    const uid =
+      data?.user?._id ||
+      data?.user?.id ||
+      storedUser.id ||
+      storedUser._id;
+
     if (uid) {
       fetchRecentWeights(uid);
     }
@@ -221,12 +322,14 @@ const Dashboard = () => {
 
   const fetchRoadmapData = async (userId) => {
     try {
-      const res = await fetch(`import.meta.env.VITE_API_URL/api/roadmap/${userId}`, {
+      const res = await api.get(`/api/roadmap/${userId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
-      const data = await res.json();
+
+      const data = res.data;
+
       if (data.success) {
         setRoadmapData(data.roadmap);
       }
@@ -236,7 +339,10 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const currentUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = currentUser?._id || currentUser?.id;
 
     if (userId) {
@@ -245,13 +351,21 @@ const Dashboard = () => {
   }, []);
 
   const fetchAnalytics = async () => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
+
     if (!userId) return;
 
     try {
-      const res = await fetch(`import.meta.env.VITE_API_URL/api/log/analytics/${userId}`);
-      const aData = await res.json();
+      const res = await api.get(
+        `/api/log/analytics/${userId}`
+      );
+
+      const aData = res.data;
+
       if (aData.success) {
         setAnalytics(aData);
         setAnalyticsData(aData);
@@ -271,33 +385,61 @@ const Dashboard = () => {
     navigate("/login");
   };
 
-  const handleOpenSwap = async (type, currentItem, dayName) => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const handleOpenSwap = async (
+    type,
+    currentItem,
+    dayName
+  ) => {
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
 
-    setSwapData({ type, currentItem, dayName, suggestions: [] });
+    setSwapData({
+      type,
+      currentItem,
+      dayName,
+      suggestions: [],
+    });
+
     setSwapModalOpen(true);
     setSwapLoading(true);
 
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/swap/suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, currentItem, dayName, userId }),
-      });
-      const result = await res.json();
+      const res = await api.post(
+        "/api/swap/suggestions",
+        {
+          type,
+          currentItem,
+          dayName,
+          userId,
+        }
+      );
+
+      const result = res.data;
+
       if (result.success) {
-        setSwapData((prev) => ({ ...prev, suggestions: result.suggestions }));
+        setSwapData((prev) => ({
+          ...prev,
+          suggestions: result.suggestions,
+        }));
       }
     } catch (err) {
-      console.error("Failed to fetch swap suggestions:", err);
+      console.error(
+        "Failed to fetch swap suggestions:",
+        err
+      );
     } finally {
       setSwapLoading(false);
     }
   };
 
   const handleApplySwap = async (selectedItem) => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
 
     setUpdating(true);
@@ -309,16 +451,12 @@ const Dashboard = () => {
           ? swapData.currentItem.name
           : swapData.currentItem.mealName;
 
-      await fetch("import.meta.env.VITE_API_URL/api/swap/apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          type: swapData.type,
-          dayName: swapData.dayName,
-          oldItemName,
-          newItem: selectedItem,
-        }),
+      await api.post("/api/swap/apply", {
+        userId,
+        type: swapData.type,
+        dayName: swapData.dayName,
+        oldItemName,
+        newItem: selectedItem,
       });
 
       await fetchDashboardAndLogs();
@@ -331,35 +469,61 @@ const Dashboard = () => {
 
   const handleSendMessage = async (customText = null) => {
     const textToSend = customText || chatInput;
+
     if (!textToSend.trim() || chatLoading) return;
 
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
 
-    const newMessages = [...chatMessages, { sender: "user", text: textToSend }];
+    const newMessages = [
+      ...chatMessages,
+      {
+        sender: "user",
+        text: textToSend,
+      },
+    ];
+
     setChatMessages(newMessages);
-    if (!customText) setChatInput("");
+
+    if (!customText) {
+      setChatInput("");
+    }
+
     setChatLoading(true);
 
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/coach/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const res = await api.post(
+        "/api/coach/chat",
+        {
           userId,
           message: textToSend,
           history: newMessages,
-        }),
-      });
-      const result = await res.json();
+        }
+      );
+
+      const result = res.data;
+
       if (result.success) {
-        setChatMessages((prev) => [...prev, { sender: "coach", text: result.reply }]);
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            sender: "coach",
+            text: result.reply,
+          },
+        ]);
       }
     } catch (err) {
       console.error("Chat Error:", err);
+
       setChatMessages((prev) => [
         ...prev,
-        { sender: "coach", text: "Connection error. Make sure backend is active." },
+        {
+          sender: "coach",
+          text: "Connection error. Make sure backend is active.",
+        },
       ]);
     } finally {
       setChatLoading(false);
@@ -367,76 +531,143 @@ const Dashboard = () => {
   };
 
   const handleToggleExercise = async (exerciseName) => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
-    const totalExercises = data?.todayWorkout?.exercises?.length || 4;
+
+    const totalExercises =
+      data?.todayWorkout?.exercises?.length || 4;
 
     setDailyLog((prev) => {
       if (!prev) return prev;
-      const exists = prev.completedExercises?.some((item) =>
-        typeof item === "string" ? item === exerciseName : item?.name === exerciseName
+
+      const exists = prev.completedExercises?.some(
+        (item) =>
+          typeof item === "string"
+            ? item === exerciseName
+            : item?.name === exerciseName
       );
+
       const updated = exists
-        ? prev.completedExercises.filter((item) =>
-            typeof item === "string" ? item !== exerciseName : item?.name !== exerciseName
+        ? prev.completedExercises.filter(
+            (item) =>
+              typeof item === "string"
+                ? item !== exerciseName
+                : item?.name !== exerciseName
           )
-        : [...(prev.completedExercises || []), { name: exerciseName, set: 1, weight: 0, rpe: 8 }];
-      return { ...prev, completedExercises: updated };
+        : [
+            ...(prev.completedExercises || []),
+            {
+              name: exerciseName,
+              set: 1,
+              weight: 0,
+              rpe: 8,
+            },
+          ];
+
+      return {
+        ...prev,
+        completedExercises: updated,
+      };
     });
 
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/log/toggle-exercise", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, exerciseName, totalExercises }),
-      });
-      const result = await res.json();
-      if (result.success) setDailyLog(result.log);
+      const res = await api.post(
+        "/api/log/toggle-exercise",
+        {
+          userId,
+          exerciseName,
+          totalExercises,
+        }
+      );
+
+      const result = res.data;
+
+      if (result.success) {
+        setDailyLog(result.log);
+      }
     } catch (err) {
       console.error("Failed to toggle exercise:", err);
     }
   };
 
   const handleToggleMeal = async (mealName) => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
-    const totalExercises = data?.todayWorkout?.exercises?.length || 4;
+
+    const totalExercises =
+      data?.todayWorkout?.exercises?.length || 4;
 
     setDailyLog((prev) => {
       if (!prev) return prev;
+
       const exists = prev.consumedMeals?.includes(mealName);
+
       const updated = exists
-        ? prev.consumedMeals.filter((m) => m !== mealName)
-        : [...(prev.consumedMeals || []), mealName];
-      return { ...prev, consumedMeals: updated };
+        ? prev.consumedMeals.filter(
+            (m) => m !== mealName
+          )
+        : [
+            ...(prev.consumedMeals || []),
+            mealName,
+          ];
+
+      return {
+        ...prev,
+        consumedMeals: updated,
+      };
     });
 
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/log/toggle-meal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, mealName, totalExercises }),
-      });
-      const result = await res.json();
-      if (result.success) setDailyLog(result.log);
+      const res = await api.post(
+        "/api/log/toggle-meal",
+        {
+          userId,
+          mealName,
+          totalExercises,
+        }
+      );
+
+      const result = res.data;
+
+      if (result.success) {
+        setDailyLog(result.log);
+      }
     } catch (err) {
       console.error("Failed to toggle meal:", err);
     }
   };
 
   const handleAdjustWater = async (amountMl) => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
-    const totalExercises = data?.todayWorkout?.exercises?.length || 4;
+
+    const totalExercises =
+      data?.todayWorkout?.exercises?.length || 4;
 
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/log/water", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, amountMl, totalExercises }),
-      });
-      const result = await res.json();
-      if (result.success) setDailyLog(result.log);
+      const res = await api.post(
+        "/api/log/water",
+        {
+          userId,
+          amountMl,
+          totalExercises,
+        }
+      );
+
+      const result = res.data;
+
+      if (result.success) {
+        setDailyLog(result.log);
+      }
     } catch (err) {
       console.error("Failed to log water:", err);
     }
@@ -444,18 +675,27 @@ const Dashboard = () => {
 
   const handleLogWeight = async (e) => {
     e.preventDefault();
-    if (!newWeightInput || Number(newWeightInput) <= 0) return;
 
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!newWeightInput || Number(newWeightInput) <= 0)
+      return;
+
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
 
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/log/weight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, weight: newWeightInput }),
-      });
-      const result = await res.json();
+      const res = await api.post(
+        "/api/log/weight",
+        {
+          userId,
+          weight: newWeightInput,
+        }
+      );
+
+      const result = res.data;
+
       if (result.success) {
         setNewWeightInput("");
         fetchDashboardAndLogs();
@@ -467,29 +707,36 @@ const Dashboard = () => {
 
   const handleToggleDiet = async () => {
     if (!data?.user?.profile) return;
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
-    const currentPref = data.user.profile.dietaryPreference || "non-vegetarian";
-    const nextPref = currentPref === "vegetarian" ? "non-vegetarian" : "vegetarian";
+
+    const currentPref =
+      data.user.profile.dietaryPreference ||
+      "non-vegetarian";
+
+    const nextPref =
+      currentPref === "vegetarian"
+        ? "non-vegetarian"
+        : "vegetarian";
 
     setUpdating(true);
+
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/user/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await api.post(
+        "/api/user/onboarding",
+        {
           userId,
           ...data.user.profile,
           dietaryPreference: nextPref,
-        }),
-      });
+        }
+      );
 
-      if (!res.ok) throw new Error("Failed to update diet preference");
-
-      await fetch("import.meta.env.VITE_API_URL/api/diet/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+      await api.post("/api/diet/generate", {
+        userId,
       });
 
       await fetchDashboardAndLogs();
@@ -502,34 +749,37 @@ const Dashboard = () => {
   };
 
   const handleChangeGoal = async (newGoal) => {
-    if (!data?.user?.profile || newGoal === data.user.profile.primaryGoal) return;
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    if (
+      !data?.user?.profile ||
+      newGoal === data.user.profile.primaryGoal
+    )
+      return;
+
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
 
     setUpdating(true);
+
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/user/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await api.post(
+        "/api/user/onboarding",
+        {
           userId,
           ...data.user.profile,
           primaryGoal: newGoal,
-        }),
-      });
-
-      if (!res.ok) throw new Error("Failed to update goal");
+        }
+      );
 
       await Promise.all([
-        fetch("import.meta.env.VITE_API_URL/api/workout/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
+        api.post("/api/workout/generate", {
+          userId,
         }),
-        fetch("import.meta.env.VITE_API_URL/api/diet/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId }),
+
+        api.post("/api/diet/generate", {
+          userId,
         }),
       ]);
 
@@ -544,20 +794,40 @@ const Dashboard = () => {
 
   const calculate1RM = (w, r) => {
     if (!w || !r || Number(r) <= 0) return 0;
-    return Math.round(Number(w) * (1 + Number(r) / 30));
+
+    return Math.round(
+      Number(w) * (1 + Number(r) / 30)
+    );
   };
 
   const personalRecords = useMemo(() => {
     const recordsMap = {};
-    const exercises = dailyLog?.completedExercises || [];
+    const exercises =
+      dailyLog?.completedExercises || [];
 
     exercises.forEach((ex) => {
-      const name = ex.name || ex.exerciseName || "Exercise";
-      const w = Number(ex.weight ?? ex.weightKg ?? 0);
-      const r = Number(ex.completedReps ?? ex.repsCompleted ?? ex.targetReps ?? 1);
+      const name =
+        ex.name ||
+        ex.exerciseName ||
+        "Exercise";
+
+      const w = Number(
+        ex.weight ?? ex.weightKg ?? 0
+      );
+
+      const r = Number(
+        ex.completedReps ??
+          ex.repsCompleted ??
+          ex.targetReps ??
+          1
+      );
+
       const est1RM = calculate1RM(w, r);
 
-      if (!recordsMap[name] || est1RM > recordsMap[name].oneRepMax) {
+      if (
+        !recordsMap[name] ||
+        est1RM > recordsMap[name].oneRepMax
+      ) {
         recordsMap[name] = {
           name,
           weight: w,
@@ -575,8 +845,14 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#050507] text-slate-900 dark:text-white flex items-center justify-center">
         <div className="flex items-center gap-3 text-violet-600 dark:text-violet-400">
-          <Activity className="animate-spin" size={24} />
-          <span className="text-sm font-semibold tracking-wider uppercase">Loading KineticOS Engine...</span>
+          <Activity
+            className="animate-spin"
+            size={24}
+          />
+
+          <span className="text-sm font-semibold tracking-wider uppercase">
+            Loading KineticOS Engine...
+          </span>
         </div>
       </div>
     );
@@ -585,7 +861,10 @@ const Dashboard = () => {
   if (error || !data) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#050507] text-slate-900 dark:text-white flex flex-col items-center justify-center p-4">
-        <p className="text-red-500 dark:text-red-400 text-sm mb-4">{error || "No dashboard data available."}</p>
+        <p className="text-red-500 dark:text-red-400 text-sm mb-4">
+          {error || "No dashboard data available."}
+        </p>
+
         <button
           onClick={() => navigate("/onboarding")}
           className="px-5 py-2.5 bg-violet-600 rounded-xl text-xs font-semibold text-white cursor-pointer"
@@ -597,18 +876,51 @@ const Dashboard = () => {
   }
 
   // Resilient destructuring to resolve any schema variation from the backend
-  const { user, todayWorkout, todayDiet, currentDay } = data || {};
-  const weeklyWorkoutPlan = data?.weeklyWorkoutPlan || data?.workoutPlan || data?.plan || null;
-  const weeklyDietPlan = data?.weeklyDietPlan || data?.dietPlan || null;
+
+  const {
+    user,
+    todayWorkout,
+    todayDiet,
+    currentDay,
+  } = data || {};
+
+  const weeklyWorkoutPlan =
+    data?.weeklyWorkoutPlan ||
+    data?.workoutPlan ||
+    data?.plan ||
+    null;
+
+  const weeklyDietPlan =
+    data?.weeklyDietPlan ||
+    data?.dietPlan ||
+    null;
 
   const profile = user?.profile || {};
-  const isVeg = profile.dietaryPreference === "vegetarian";
+
+  const isVeg =
+    profile.dietaryPreference === "vegetarian";
 
   const navigationItems = [
-    { id: "overview", label: "Overview", icon: LayoutDashboard },
-    { id: "workout", label: "Weekly Workout", icon: Dumbbell },
-    { id: "nutrition", label: "Weekly Nutrition", icon: Utensils },
-    { id: "analytics", label: "Progress Analytics", icon: LineChart },
+    {
+      id: "overview",
+      label: "Overview",
+      icon: LayoutDashboard,
+    },
+    {
+      id: "workout",
+      label: "Weekly Workout",
+      icon: Dumbbell,
+    },
+    {
+      id: "nutrition",
+      label: "Weekly Nutrition",
+      icon: Utensils,
+    },
+    {
+      id: "analytics",
+      label: "Progress Analytics",
+      icon: LineChart,
+    },
   ];
 
   const availableGoals = [
@@ -621,106 +933,169 @@ const Dashboard = () => {
 
   const activeAnalytics = analyticsData || analytics;
 
-  const recoveryInfo = activeAnalytics?.recoveryData || {
-    latestEnergy: dailyLog?.energyLevel || "exhausted",
-    forceRecoveryDay: false,
-    guidance: "Optimal metabolic readiness cleared.",
-  };
+  const recoveryInfo =
+    activeAnalytics?.recoveryData || {
+      latestEnergy:
+        dailyLog?.energyLevel || "exhausted",
+      forceRecoveryDay: false,
+      guidance:
+        "Optimal metabolic readiness cleared.",
+    };
 
   const isDeloadActive =
-    activeAnalytics?.recoveryData?.forceRecoveryDay ||
-    activeAnalytics?.recoveryData?.latestEnergy === "Exhausted";
+    activeAnalytics?.recoveryData
+      ?.forceRecoveryDay ||
+    activeAnalytics?.recoveryData?.latestEnergy ===
+      "Exhausted";
 
   const handleHydrationUpdate = async (delta) => {
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+    const storedUser = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
     const userId = storedUser.id || storedUser._id;
+
     if (!userId) return;
 
-    const totalExercises = data?.todayWorkout?.exercises?.length || 4;
+    const totalExercises =
+      data?.todayWorkout?.exercises?.length || 4;
 
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/log/water", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          userId, 
+      const res = await api.post(
+        "/api/log/water",
+        {
+          userId,
           amountMl: Number(delta),
-          totalExercises 
-        }),
-      });
-      const resData = await res.json();
+          totalExercises,
+        }
+      );
+
+      const resData = res.data;
+
       if (resData.success) {
         setDailyLog(resData.log);
+
         if (typeof fetchAnalytics === "function") {
           fetchAnalytics();
         }
       } else {
-        console.error("Water log backend error:", resData.message);
+        console.error(
+          "Water log backend error:",
+          resData.message
+        );
       }
     } catch (err) {
-      console.error("Hydration update error:", err);
+      console.error(
+        "Hydration update error:",
+        err
+      );
     }
   };
 
-  const calculatedTonnage = (dailyLog?.completedExercises || []).reduce((sum, ex) => {
-    const w = Number(ex.weight ?? ex.weightKg ?? 0);
-    const r = Number(ex.completedReps ?? ex.repsCompleted ?? ex.targetReps ?? 10);
+  const calculatedTonnage = (
+    dailyLog?.completedExercises || []
+  ).reduce((sum, ex) => {
+    const w = Number(
+      ex.weight ?? ex.weightKg ?? 0
+    );
+
+    const r = Number(
+      ex.completedReps ??
+        ex.repsCompleted ??
+        ex.targetReps ??
+        10
+    );
+
     return sum + w * r;
   }, 0);
 
-  const enrichedWeeklyTrend = (activeAnalytics?.weeklyTrend || []).map((item, idx, arr) => {
+  const enrichedWeeklyTrend = (
+    activeAnalytics?.weeklyTrend || []
+  ).map((item, idx, arr) => {
     if (idx === arr.length - 1) {
-      return { ...item, tonnage: item.tonnage || calculatedTonnage };
+      return {
+        ...item,
+        tonnage:
+          item.tonnage || calculatedTonnage,
+      };
     }
-    return { ...item, tonnage: item.tonnage || 0 };
+
+    return {
+      ...item,
+      tonnage: item.tonnage || 0,
+    };
   });
 
   const handleExportFullDailyPDF = () => {
     const resolvedDailyLog =
-      (typeof todayDailyLog !== "undefined" && todayDailyLog) ||
-      (typeof dailyLog !== "undefined" && dailyLog) ||
-      (typeof logData !== "undefined" && logData) ||
+      (typeof todayDailyLog !== "undefined" &&
+        todayDailyLog) ||
+      (typeof dailyLog !== "undefined" &&
+        dailyLog) ||
+      (typeof logData !== "undefined" &&
+        logData) ||
       data?.dailyLog ||
       {};
 
     const resolvedUser =
       (typeof user !== "undefined" && user) ||
       data?.user ||
-      JSON.parse(localStorage.getItem("user") || "{}");
+      JSON.parse(
+        localStorage.getItem("user") || "{}"
+      );
 
-    const completedSets = resolvedDailyLog?.completedExercises || [];
+    const completedSets =
+      resolvedDailyLog?.completedExercises || [];
+
     const totalTonnage = completedSets.reduce(
       (sum, s) =>
         sum +
-        (Number(s.weightKg || s.weight) || 0) *
-          (Number(s.repsCompleted || s.completedReps) || 0),
+        (Number(
+          s.weightKg || s.weight
+        ) || 0) *
+          (Number(
+            s.repsCompleted ||
+              s.completedReps
+          ) || 0),
       0
     );
 
     const completedMovementsCount = new Set(
-      completedSets.map((e) => (e.exerciseName || e.name || "").toLowerCase())
+      completedSets.map((e) =>
+        (
+          e.exerciseName ||
+          e.name ||
+          ""
+        ).toLowerCase()
+      )
     ).size;
 
     const currentExercises =
-      (typeof todayWorkout !== "undefined" && todayWorkout?.exercises) ||
+      (typeof todayWorkout !== "undefined" &&
+        todayWorkout?.exercises) ||
       data?.todayWorkout?.exercises ||
       [];
 
     generateFullLifestylePDF({
       user: resolvedUser,
       dailyLog: resolvedDailyLog,
-      activePhase: (typeof activePhase !== "undefined" && activePhase) || data?.activePhase || {},
+      activePhase:
+        (typeof activePhase !== "undefined" &&
+          activePhase) ||
+        data?.activePhase ||
+        {},
       workoutSummary: {
         totalTonnage,
-        completedCount: completedMovementsCount,
-        habitScore: resolvedDailyLog?.habitScore || 0,
+        completedCount:
+          completedMovementsCount,
+        habitScore:
+          resolvedDailyLog?.habitScore || 0,
       },
       exercises: currentExercises,
       sessionLogs: {},
     });
   };
-
-  return (
+    return (
     <div className="max-h-screen bg-slate-50 text-slate-900 dark:bg-[#050507] dark:text-white flex relative overflow-x-hidden transition-colors duration-300">
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import api from "../config/Api.jsx";
 import { AlertTriangle, ShieldCheck, Flame, ArrowRight, X,Loader2 } from "lucide-react";
 
 const RiskInterventionBanner = ({ userId,onInterventionApplied }) => {
@@ -11,8 +12,8 @@ const RiskInterventionBanner = ({ userId,onInterventionApplied }) => {
 
     const fetchRiskStatus = async () => {
       try {
-        const res = await fetch(`import.meta.env.VITE_API_URL/api/risk/status/${userId}`);
-        const data = await res.json();
+        const res = await api.get(`/api/risk/status/${userId}`);
+        const data = res.data;
         if (data.success) {
           setRiskData(data);
         }
@@ -28,16 +29,13 @@ const RiskInterventionBanner = ({ userId,onInterventionApplied }) => {
     if (!riskData?.intervention?.type) return;
     setApplying(true);
     try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/training/apply-intervention", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const res = await api.post("/api/training/apply-intervention", {
           userId,
-          interventionType: riskData.intervention.type
-        })
-      });
-      const data = await res.json();
-      
+          interventionType: riskData.intervention.type,
+        });
+
+        const data = res.data;
+              
       if (data.success) {
         if (typeof onInterventionApplied === "function") {
           onInterventionApplied(data.updatedTodayWorkout);

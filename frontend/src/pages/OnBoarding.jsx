@@ -63,40 +63,83 @@ const Onboarding = () => {
   };
 
   const handleFinish = async () => {
-    setError("");
-    setLoading(true);
+  setError("");
+  setLoading(true);
 
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-    const userId = storedUser.id || storedUser._id;
+  const storedUser = JSON.parse(
+    localStorage.getItem("user") || "{}"
+  );
 
-    try {
-      const res = await fetch("import.meta.env.VITE_API_URL/api/user/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, ...formData }),
-      });
+  const userId = storedUser.id || storedUser._id;
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || "Failed to complete setup");
-        setLoading(false);
-        return;
-      }
+  const API_URL = import.meta.env.VITE_API_URL;
 
-      // 2. Generate 7-Day Workout Routine
-      await fetch("import.meta.env.VITE_API_URL/api/workout/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
+  try {
+    // 1. Save onboarding data
+    const res = await fetch(`${API_URL}/api/user/onboarding`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userId,
+        ...formData,
+      }),
+    });
 
-      localStorage.setItem("user", JSON.stringify(data.user));
-      navigate("/dashboard");
-    } catch (err) {
-      setError("Unable to connect to server");
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.message || "Failed to complete setup");
       setLoading(false);
+      return;
     }
-  };
+
+    // 2. Generate 7-Day Workout Routine
+    const workoutRes = await fetch(
+      `${API_URL}/api/workout/generate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId }),
+      }
+    );
+
+    const workoutData = await workoutRes.json();
+
+    if (!workoutRes.ok) {
+      setError(
+        workoutData.message || "Failed to generate workout plan"
+      );
+      setLoading(false);
+      return;
+    }
+
+    console.log("Generated workout:", workoutData);
+
+    // 3. Save user
+    localStorage.setItem(
+      "user",
+      JSON.stringify(data.user)
+    );
+
+    // 4. Save generated workout
+    localStorage.setItem(
+      "workoutPlan",
+      JSON.stringify(workoutData)
+    );
+
+    // 5. Go dashboard
+    navigate("/dashboard");
+
+  } catch (err) {
+    console.error("Onboarding error:", err);
+    setError("Unable to connect to server");
+    setLoading(false);
+  }
+};
 
   const preview = calculatePreview();
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import api from "../config/Api";
 import { AlertCircle, AlertTriangle, Info, X } from "lucide-react";
 
 const AnnouncementBanner = () => {
@@ -10,16 +11,19 @@ useEffect(() => {
   const fetchActiveBanner = async () => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) return; // Don't fetch if user isn't logged in yet
 
-      const res = await fetch("import.meta.env.VITE_API_URL/api/announcements/active", {
+      if (!token) return;
+
+      const res = await api.get("/api/announcements/active", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
+      
+
       if (!res.ok) return;
-      const data = await res.json();
+    const data = res.data;
       if (data.success && data.announcement) {
         const dismissedId = localStorage.getItem("dismissed_announcement");
         if (dismissedId !== data.announcement._id) {
