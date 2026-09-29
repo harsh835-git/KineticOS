@@ -59,11 +59,7 @@ const Login = () => {
      const response = await api.post("/api/auth/login", formData);
     const data = response.data;
 
-      if (!response.ok) {
-        alert(data.message);
-        return;
-      }
-
+      
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
