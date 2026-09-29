@@ -53,6 +53,11 @@ app.use(
 );
 app.use(express.json());
 
+app.use((req, res, next) => {
+  console.log("REQUEST:", req.method, req.originalUrl);
+  console.log("ORIGIN:", req.headers.origin);
+  next();
+});
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
