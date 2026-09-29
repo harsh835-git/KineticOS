@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import api from "../config/Api.jsx";
 import {
   Activity,
   ArrowRight,
@@ -17,7 +18,7 @@ import { Link, useNavigate } from "react-router-dom";
 import ForgotPasswordModal from "../components/publicModals/ForgotPasswordModal";
 import { useGoogleLogin } from "@react-oauth/google";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://kinetecos-api.onrender.com";
+
 
 const Login = () => {
   const navigate = useNavigate();
@@ -55,15 +56,8 @@ const Login = () => {
     e.preventDefault();
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
+     const response = await api.post("/api/auth/login", formData);
+    const data = response.data;
 
       if (!response.ok) {
         alert(data.message);
@@ -74,10 +68,10 @@ const Login = () => {
       localStorage.setItem("user", JSON.stringify(data.user));
 
       handlePostLoginNavigation(data.user);
-    } catch (error) {
-      console.error(error);
-      alert("Unable to connect to server.");
-    }
+   } catch (error) {
+  console.error(error);
+  alert(error.response?.data?.message || "Unable to connect to server.");
+}
   };
 
   const handleForgotPassword = async () => {
@@ -90,21 +84,12 @@ const Login = () => {
       setForgotLoading(true);
       setForgotMessage("");
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/auth/forgot-password`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: forgotEmail.trim().toLowerCase(),
-          }),
-        },
-      );
+     const response = await api.post("/api/auth/forgot-password", {
+  email: forgotEmail.trim().toLowerCase(),
+});
 
-      const data = await response.json();
-      setForgotMessage(data.message);
+const data = response.data;
+setForgotMessage(data.message);
     } catch (error) {
       console.error(error);
       setForgotMessage("Something went wrong. Please try again.");
@@ -122,17 +107,13 @@ const Login = () => {
         },
       ).then((res) => res.json());
 
-      const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          credential: tokenResponse.access_token,
-          email: userInfo.email,
-          name: userInfo.name,
-        }),
+     const res = await api.post("/api/auth/google", {
+        credential: tokenResponse.access_token,
+        email: userInfo.email,
+        name: userInfo.name,
       });
 
-      const data = await res.json();
+      const data = res.data;
       if (!res.ok) {
         alert(data.message || "Google login failed");
         return;

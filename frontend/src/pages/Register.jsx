@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import api from "../config/Api.jsx";
 import { useNavigate } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
 import {
@@ -19,7 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://kinetecos-api.onrender.com";
+
 
 const Register = () => {
   const navigate = useNavigate();
@@ -39,61 +40,59 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
 
   // ================= GOOGLE REGISTRATION / LOGIN =================
-  const handleGoogleSuccess = async (tokenResponse) => {
-    setError("");
-    setMessage("");
-    setLoading(true);
+ const handleGoogleSuccess = async (tokenResponse) => {
+  setError("");
+  setMessage("");
+  setLoading(true);
 
-    try {
-      const userInfo = await fetch(
-        "https://www.googleapis.com/oauth2/v3/userinfo",
-        {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        }
-      ).then((res) => res.json());
-
-      const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          credential: tokenResponse.access_token,
-          email: userInfo.email,
-          name: userInfo.name,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || "Google authentication failed");
-        setLoading(false);
-        return;
+  try {
+    const userInfo = await fetch(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: {
+          Authorization: `Bearer ${tokenResponse.access_token}`,
+        },
       }
-      if (!data.isNewUser) {
-        setError("This Google email is already registered. Please login instead.");
-        setLoading(false);
-        return;
-      }
+    ).then((res) => res.json());
 
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+    const res = await api.post("/api/auth/google", {
+      credential: tokenResponse.access_token,
+      email: userInfo.email,
+      name: userInfo.name,
+    });
 
-      setMessage(data.message || "Signed in successfully!");
+    const data = res.data;
 
-      setTimeout(() => {
-        if (data.user?.isOnboarded) {
-          navigate("/dashboard");
-        } else {
-          navigate("/onboarding");
-        }
-      }, 1200);
-    } catch (err) {
-      console.error("Google Auth Error:", err);
-      setError("Failed to authenticate with Google.");
-    } finally {
+    if (!data.isNewUser) {
+      setError(
+        "This Google email is already registered. Please login instead."
+      );
       setLoading(false);
+      return;
     }
-  };
+
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("user", JSON.stringify(data.user));
+
+    setMessage(data.message || "Signed in successfully!");
+
+    setTimeout(() => {
+      if (data.user?.isOnboarded) {
+        navigate("/dashboard");
+      } else {
+        navigate("/onboarding");
+      }
+    }, 1200);
+  } catch (err) {
+    console.error("Google Auth Error:", err);
+    setError(
+      err.response?.data?.message ||
+        "Failed to authenticate with Google."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const registerWithGoogle = useGoogleLogin({
     onSuccess: handleGoogleSuccess,
@@ -115,13 +114,9 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+     const res = await api.post("/api/auth/register", formData);
 
-      const data = await res.json();
+      const data = res.data;
 
       if (!res.ok) {
         setError(data.message || "Email is already registered. Please log in.");
@@ -136,13 +131,14 @@ const Register = () => {
       setTimeout(() => {
         navigate("/onboarding");
       }, 1500);
-    } catch (err) {
-      console.error("Register Error:", err);
-      setError("Unable to reach the server. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+   } catch (err) {
+  console.error("Register Error:", err);
+  setError(
+    err.response?.data?.message ||
+      "Unable to reach the server. Please try again."
+  );
+}
+  }
 
   return (
     <div className="min-h-screen overflow-hidden bg-[#050507] text-white relative">
