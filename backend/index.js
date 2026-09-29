@@ -26,7 +26,7 @@ const app = express();
 // Normalize origins and support both local dev and production client domains
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://kinetic-os-ten.vercel.app",
+  "https://kineticos.vercel.app",
   process.env.CLIENT_URL ? process.env.CLIENT_URL.replace(/\/$/, "") : null,
 ].filter(Boolean);
 
