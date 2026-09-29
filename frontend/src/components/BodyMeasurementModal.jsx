@@ -21,7 +21,7 @@ const BodyMeasurementModal = ({ isOpen, onClose, userId, onSaved, initialValues 
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("http://localhost:5000/api/log/measurements", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/log/measurements", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, ...form }),

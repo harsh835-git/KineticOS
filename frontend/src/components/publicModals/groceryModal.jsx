@@ -164,7 +164,7 @@ const GroceryModal = ({
       const groceryText = formatGroceryText(groceryCategories, resolvedName, resolvedCalories);
       const token = localStorage.getItem("token");
 
-         const response = await fetch("http://localhost:5000/api/plan/send-grocery-email", {
+         const response = await fetch("import.meta.env.VITE_API_URL/api/plan/send-grocery-email", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

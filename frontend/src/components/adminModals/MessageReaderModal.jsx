@@ -14,7 +14,7 @@ const MessageReaderModal = ({ message, onClose, onReplySuccess }) => {
     try {
       setSending(true);
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/contact/${message._id}/reply`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/contact/${message._id}/reply`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

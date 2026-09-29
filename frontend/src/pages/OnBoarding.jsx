@@ -70,7 +70,7 @@ const Onboarding = () => {
     const userId = storedUser.id || storedUser._id;
 
     try {
-      const res = await fetch("http://localhost:5000/api/user/onboarding", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/user/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, ...formData }),
@@ -84,7 +84,7 @@ const Onboarding = () => {
       }
 
       // 2. Generate 7-Day Workout Routine
-      await fetch("http://localhost:5000/api/workout/generate", {
+      await fetch("import.meta.env.VITE_API_URL/api/workout/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),

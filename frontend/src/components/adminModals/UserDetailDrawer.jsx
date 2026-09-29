@@ -38,7 +38,7 @@ const UserDetailDrawer = ({ userId, onClose }) => {
         const token = localStorage.getItem("token");
 
         // 1. Fetch user telemetry and current active plans
-        const resUser = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
+        const resUser = await fetch(`import.meta.env.VITE_API_URL/api/admin/users/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const dataUser = await resUser.json();
@@ -47,7 +47,7 @@ const UserDetailDrawer = ({ userId, onClose }) => {
         }
 
         // 2. Fetch workout templates
-        const resWorkouts = await fetch("http://localhost:5000/api/admin/templates", {
+        const resWorkouts = await fetch("import.meta.env.VITE_API_URL/api/admin/templates", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const dataWorkouts = await resWorkouts.json();
@@ -56,7 +56,7 @@ const UserDetailDrawer = ({ userId, onClose }) => {
         if (workoutList.length > 0) setSelectedWorkoutId(workoutList[0]._id);
 
         // 3. Fetch diet templates
-        const resDiets = await fetch("http://localhost:5000/api/admin/diet-templates", {
+        const resDiets = await fetch("import.meta.env.VITE_API_URL/api/admin/diet-templates", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const dataDiets = await resDiets.json();
@@ -79,7 +79,7 @@ const UserDetailDrawer = ({ userId, onClose }) => {
     try {
       setAssigningWorkout(true);
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/users/${userId}/assign-template`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/users/${userId}/assign-template`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ templateId: selectedWorkoutId }),
@@ -105,7 +105,7 @@ const UserDetailDrawer = ({ userId, onClose }) => {
     try {
       setDeletingWorkout(true);
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/users/${userId}/workout-plan`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/users/${userId}/workout-plan`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -129,7 +129,7 @@ const UserDetailDrawer = ({ userId, onClose }) => {
     try {
       setAssigningDiet(true);
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/users/${userId}/assign-diet`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/users/${userId}/assign-diet`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ templateId: selectedDietId }),
@@ -155,7 +155,7 @@ const UserDetailDrawer = ({ userId, onClose }) => {
     try {
       setDeletingDiet(true);
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/users/${userId}/diet-plan`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/users/${userId}/diet-plan`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

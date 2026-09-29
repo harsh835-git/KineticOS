@@ -23,7 +23,7 @@ const ExerciseTracker = ({ userId }) => {
   const fetchTodaySets = async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/training/today-sets/${userId}`);
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/training/today-sets/${userId}`);
       const data = await res.json();
       if (data.success) {
         setLoggedSets(data.exercises || []);
@@ -55,7 +55,7 @@ const ExerciseTracker = ({ userId }) => {
     const isNewPR = currentEstimated1RM > priorBest1RM && priorBest1RM > 0;
 
     try {
-      const res = await fetch("http://localhost:5000/api/training/log-set", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/training/log-set", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

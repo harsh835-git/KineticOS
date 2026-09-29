@@ -52,7 +52,7 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/admin/metrics", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/admin/metrics", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -77,7 +77,7 @@ const AdminDashboard = () => {
   const fetchTemplates = async () => {
   try {
     const token = localStorage.getItem("token");
-    const res = await fetch("http://localhost:5000/api/admin/templates", {
+    const res = await fetch("import.meta.env.VITE_API_URL/api/admin/templates", {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
@@ -101,7 +101,7 @@ const AdminDashboard = () => {
   const fetchDietTemplates = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/admin/diet-templates", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/admin/diet-templates", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -116,7 +116,7 @@ const AdminDashboard = () => {
   const fetchAnnouncements = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/admin/announcements", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/admin/announcements", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -141,7 +141,7 @@ const AdminDashboard = () => {
     if (!window.confirm("Are you sure you want to delete this template?")) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/templates/${id}`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/templates/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -158,7 +158,7 @@ const AdminDashboard = () => {
     if (!window.confirm("Delete this diet template?")) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/diet-templates/${id}`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/diet-templates/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -176,7 +176,7 @@ const AdminDashboard = () => {
     try {
       setUpdatingUser(userId);
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/admin/users/role", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/admin/users/role", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -207,7 +207,7 @@ const AdminDashboard = () => {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/contact/${msg._id}/read`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/contact/${msg._id}/read`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -240,7 +240,7 @@ const AdminDashboard = () => {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/users/${userId}/block`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/users/${userId}/block`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -264,7 +264,7 @@ const AdminDashboard = () => {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/users/${userId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -287,7 +287,7 @@ const AdminDashboard = () => {
 
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/contact/${id}`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/contact/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -309,7 +309,7 @@ const AdminDashboard = () => {
   const handleToggleAnnouncement = async (id) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/announcements/${id}/toggle`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/announcements/${id}/toggle`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -329,7 +329,7 @@ const AdminDashboard = () => {
     if (!window.confirm("Delete this announcement?")) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/admin/announcements/${id}`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/admin/announcements/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

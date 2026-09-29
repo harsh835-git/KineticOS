@@ -12,7 +12,7 @@ useEffect(() => {
       const token = localStorage.getItem("token");
       if (!token) return; // Don't fetch if user isn't logged in yet
 
-      const res = await fetch("http://localhost:5000/api/announcements/active", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/announcements/active", {
         headers: {
           Authorization: `Bearer ${token}`,
         },

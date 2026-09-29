@@ -136,9 +136,9 @@ const Dashboard = () => {
 
     try {
       const [dashRes, logRes, analyticsRes] = await Promise.all([
-        fetch(`http://localhost:5000/api/user/dashboard/${userId}`),
-        fetch(`http://localhost:5000/api/log/today/${userId}`),
-        fetch(`http://localhost:5000/api/log/analytics/${userId}`),
+        fetch(`import.meta.env.VITE_API_URL/api/user/dashboard/${userId}`),
+        fetch(`import.meta.env.VITE_API_URL/api/log/today/${userId}`),
+        fetch(`import.meta.env.VITE_API_URL/api/log/analytics/${userId}`),
       ]);
 
       let dashData = await dashRes.json();
@@ -157,7 +157,7 @@ const Dashboard = () => {
 
       if (isRoutineEmpty) {
         console.log("Empty or unpopulated workout routine detected. Auto-generating full routine...");
-        const genRes = await fetch("http://localhost:5000/api/workout/generate", {
+        const genRes = await fetch("import.meta.env.VITE_API_URL/api/workout/generate", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -201,7 +201,7 @@ const Dashboard = () => {
   const fetchRecentWeights = async (uid) => {
     if (!uid) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/session/recent-weights/${uid}`);
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/session/recent-weights/${uid}`);
       const data = await res.json();
       if (data.success) {
         setRecentWeights(data.weights || {});
@@ -221,7 +221,7 @@ const Dashboard = () => {
 
   const fetchRoadmapData = async (userId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/roadmap/${userId}`, {
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/roadmap/${userId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -250,7 +250,7 @@ const Dashboard = () => {
     if (!userId) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/log/analytics/${userId}`);
+      const res = await fetch(`import.meta.env.VITE_API_URL/api/log/analytics/${userId}`);
       const aData = await res.json();
       if (aData.success) {
         setAnalytics(aData);
@@ -280,7 +280,7 @@ const Dashboard = () => {
     setSwapLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/swap/suggestions", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/swap/suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, currentItem, dayName, userId }),
@@ -309,7 +309,7 @@ const Dashboard = () => {
           ? swapData.currentItem.name
           : swapData.currentItem.mealName;
 
-      await fetch("http://localhost:5000/api/swap/apply", {
+      await fetch("import.meta.env.VITE_API_URL/api/swap/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -342,7 +342,7 @@ const Dashboard = () => {
     setChatLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/coach/chat", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/coach/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -385,7 +385,7 @@ const Dashboard = () => {
     });
 
     try {
-      const res = await fetch("http://localhost:5000/api/log/toggle-exercise", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/log/toggle-exercise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, exerciseName, totalExercises }),
@@ -412,7 +412,7 @@ const Dashboard = () => {
     });
 
     try {
-      const res = await fetch("http://localhost:5000/api/log/toggle-meal", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/log/toggle-meal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, mealName, totalExercises }),
@@ -430,7 +430,7 @@ const Dashboard = () => {
     const totalExercises = data?.todayWorkout?.exercises?.length || 4;
 
     try {
-      const res = await fetch("http://localhost:5000/api/log/water", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/log/water", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, amountMl, totalExercises }),
@@ -450,7 +450,7 @@ const Dashboard = () => {
     const userId = storedUser.id || storedUser._id;
 
     try {
-      const res = await fetch("http://localhost:5000/api/log/weight", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/log/weight", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, weight: newWeightInput }),
@@ -474,7 +474,7 @@ const Dashboard = () => {
 
     setUpdating(true);
     try {
-      const res = await fetch("http://localhost:5000/api/user/onboarding", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/user/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -486,7 +486,7 @@ const Dashboard = () => {
 
       if (!res.ok) throw new Error("Failed to update diet preference");
 
-      await fetch("http://localhost:5000/api/diet/generate", {
+      await fetch("import.meta.env.VITE_API_URL/api/diet/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
@@ -508,7 +508,7 @@ const Dashboard = () => {
 
     setUpdating(true);
     try {
-      const res = await fetch("http://localhost:5000/api/user/onboarding", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/user/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -521,12 +521,12 @@ const Dashboard = () => {
       if (!res.ok) throw new Error("Failed to update goal");
 
       await Promise.all([
-        fetch("http://localhost:5000/api/workout/generate", {
+        fetch("import.meta.env.VITE_API_URL/api/workout/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId }),
         }),
-        fetch("http://localhost:5000/api/diet/generate", {
+        fetch("import.meta.env.VITE_API_URL/api/diet/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId }),
@@ -639,7 +639,7 @@ const Dashboard = () => {
     const totalExercises = data?.todayWorkout?.exercises?.length || 4;
 
     try {
-      const res = await fetch("http://localhost:5000/api/log/water", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/log/water", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

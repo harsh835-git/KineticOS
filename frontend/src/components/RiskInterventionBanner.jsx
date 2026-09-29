@@ -11,7 +11,7 @@ const RiskInterventionBanner = ({ userId,onInterventionApplied }) => {
 
     const fetchRiskStatus = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/risk/status/${userId}`);
+        const res = await fetch(`import.meta.env.VITE_API_URL/api/risk/status/${userId}`);
         const data = await res.json();
         if (data.success) {
           setRiskData(data);
@@ -28,7 +28,7 @@ const RiskInterventionBanner = ({ userId,onInterventionApplied }) => {
     if (!riskData?.intervention?.type) return;
     setApplying(true);
     try {
-      const res = await fetch("http://localhost:5000/api/training/apply-intervention", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/training/apply-intervention", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

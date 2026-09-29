@@ -431,7 +431,7 @@ const ActiveWorkoutModal = ({
     setIsSubmitting(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/session/save", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/session/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formattedPayload),

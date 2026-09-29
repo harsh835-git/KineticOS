@@ -114,7 +114,7 @@ const CreateTemplateModal = ({ isOpen, onClose, onSaveSuccess }) => {
     try {
       setSubmitting(true);
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/admin/templates", {
+      const res = await fetch("import.meta.env.VITE_API_URL/api/admin/templates", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
